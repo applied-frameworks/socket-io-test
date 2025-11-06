@@ -30,12 +30,14 @@ const authenticateSocket = (socket, next) => {
     if (err) {
       return next(new Error('Invalid or expired token'));
     }
-    
+
     socket.user = {
       userId: decoded.userId,
-      username: decoded.username
+      firstName: decoded.firstName,
+      lastName: decoded.lastName,
+      email: decoded.email
     };
-    
+
     next();
   });
 };

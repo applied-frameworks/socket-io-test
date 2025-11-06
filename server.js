@@ -55,12 +55,15 @@ io.use(authenticateSocket);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.user.username} (${socket.id})`);
-  
+  const userFullName = `${socket.user.firstName} ${socket.user.lastName}`;
+  console.log(`User connected: ${userFullName} (${socket.id})`);
+
   // Send user info
   socket.emit('user:connected', {
     userId: socket.user.userId,
-    username: socket.user.username
+    firstName: socket.user.firstName,
+    lastName: socket.user.lastName,
+    email: socket.user.email
   });
 
   // Join a canvas room
@@ -68,8 +71,10 @@ io.on('connection', (socket) => {
     socket.join(canvasId);
     socket.currentCanvas = canvasId;
 
+    const userFullName = `${socket.user.firstName} ${socket.user.lastName}`;
+
     // Add user to canvas
-    canvasManager.addUser(canvasId, socket.user.userId, socket.user.username);
+    canvasManager.addUser(canvasId, socket.user.userId, userFullName);
 
     // Send current canvas state to the newly joined user
     const canvasState = canvasManager.getCanvasState(canvasId);
@@ -78,14 +83,16 @@ io.on('connection', (socket) => {
     // Notify others in the room
     socket.to(canvasId).emit('user:joined', {
       userId: socket.user.userId,
-      username: socket.user.username
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName,
+      email: socket.user.email
     });
 
     // Send updated list of active users to everyone in the room
     const users = canvasManager.getCanvasUsers(canvasId);
     io.to(canvasId).emit('canvas:users', users);
 
-    console.log(`${socket.user.username} joined canvas: ${canvasId}`);
+    console.log(`${userFullName} joined canvas: ${canvasId}`);
   });
 
   // Drawing events
@@ -93,10 +100,11 @@ io.on('connection', (socket) => {
     const drawData = {
       ...data,
       userId: socket.user.userId,
-      username: socket.user.username,
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName,
       timestamp: Date.now()
     };
-    
+
     socket.to(socket.currentCanvas).emit('draw:start', drawData);
     canvasManager.addDrawEvent(socket.currentCanvas, drawData);
   });
@@ -126,10 +134,11 @@ io.on('connection', (socket) => {
     const shapeData = {
       ...data,
       userId: socket.user.userId,
-      username: socket.user.username,
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName,
       timestamp: Date.now()
     };
-    
+
     socket.to(socket.currentCanvas).emit('shape:add', shapeData);
     canvasManager.addShape(socket.currentCanvas, shapeData);
   });
@@ -154,7 +163,8 @@ io.on('connection', (socket) => {
   socket.on('canvas:clear', () => {
     socket.to(socket.currentCanvas).emit('canvas:clear', {
       userId: socket.user.userId,
-      username: socket.user.username
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName
     });
     canvasManager.clearCanvas(socket.currentCanvas);
   });
@@ -163,7 +173,8 @@ io.on('connection', (socket) => {
   socket.on('cursor:move', (data) => {
     socket.to(socket.currentCanvas).emit('cursor:move', {
       userId: socket.user.userId,
-      username: socket.user.username,
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName,
       x: data.x,
       y: data.y
     });
@@ -173,22 +184,25 @@ io.on('connection', (socket) => {
   socket.on('chat:message', (message) => {
     const chatMessage = {
       userId: socket.user.userId,
-      username: socket.user.username,
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName,
       message: message,
       timestamp: Date.now()
     };
-    
+
     io.to(socket.currentCanvas).emit('chat:message', chatMessage);
   });
 
   // Disconnection
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.user.username} (${socket.id})`);
+    const userFullName = `${socket.user.firstName} ${socket.user.lastName}`;
+    console.log(`User disconnected: ${userFullName} (${socket.id})`);
 
     if (socket.currentCanvas) {
       socket.to(socket.currentCanvas).emit('user:left', {
         userId: socket.user.userId,
-        username: socket.user.username
+        firstName: socket.user.firstName,
+        lastName: socket.user.lastName
       });
 
       canvasManager.removeUser(socket.currentCanvas, socket.user.userId);
@@ -201,7 +215,8 @@ io.on('connection', (socket) => {
 
   // Error handling
   socket.on('error', (error) => {
-    console.error(`Socket error for user ${socket.user.username}:`, error);
+    const userFullName = `${socket.user.firstName} ${socket.user.lastName}`;
+    console.error(`Socket error for user ${userFullName}:`, error);
   });
 });
 

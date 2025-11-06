@@ -1,7 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
 test.describe('Authentication', () => {
-  let testUsername;
+  let testFirstName;
+  let testLastName;
   let testPassword;
   let testEmail;
 
@@ -9,7 +10,8 @@ test.describe('Authentication', () => {
     // Generate unique credentials for each test run
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    testUsername = `testuser_${timestamp}_${random}`;
+    testFirstName = 'Test';
+    testLastName = `User${timestamp}`;
     testPassword = 'testPassword123';
     testEmail = `test_${timestamp}_${random}@example.com`;
   });
@@ -17,9 +19,10 @@ test.describe('Authentication', () => {
   test('should successfully sign up a new user', async ({ request }) => {
     const response = await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: testPassword,
-        email: testEmail
+        firstName: testFirstName,
+        lastName: testLastName,
+        email: testEmail,
+        password: testPassword
       }
     });
 
@@ -37,7 +40,8 @@ test.describe('Authentication', () => {
     // Verify user data
     expect(data.user).toBeDefined();
     expect(data.user.id).toBeDefined();
-    expect(data.user.username).toBe(testUsername);
+    expect(data.user.firstName).toBe(testFirstName);
+    expect(data.user.lastName).toBe(testLastName);
     expect(data.user.email).toBe(testEmail);
 
     // Password should not be returned
@@ -48,9 +52,10 @@ test.describe('Authentication', () => {
     // First, register the user
     const registerResponse = await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: testPassword,
-        email: testEmail
+        firstName: testFirstName,
+        lastName: testLastName,
+        email: testEmail,
+        password: testPassword
       }
     });
 
@@ -61,7 +66,7 @@ test.describe('Authentication', () => {
     // Now, log in with the same credentials
     const loginResponse = await request.post('/api/auth/login', {
       data: {
-        username: testUsername,
+        email: testEmail,
         password: testPassword
       }
     });
@@ -80,67 +85,72 @@ test.describe('Authentication', () => {
     // Verify user data matches registration
     expect(loginData.user).toBeDefined();
     expect(loginData.user.id).toBe(registeredUserId);
-    expect(loginData.user.username).toBe(testUsername);
+    expect(loginData.user.firstName).toBe(testFirstName);
+    expect(loginData.user.lastName).toBe(testLastName);
     expect(loginData.user.email).toBe(testEmail);
 
     // Password should not be returned
     expect(loginData.user.password).toBeUndefined();
   });
 
-  test('should fail to register with existing username', async ({ request }) => {
+  test('should fail to register with existing email', async ({ request }) => {
     // Register first user
     await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: testPassword,
-        email: testEmail
+        firstName: testFirstName,
+        lastName: testLastName,
+        email: testEmail,
+        password: testPassword
       }
     });
 
-    // Try to register again with same username
+    // Try to register again with same email
     const duplicateResponse = await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: 'differentPassword',
-        email: 'different@example.com'
+        firstName: 'Different',
+        lastName: 'User',
+        email: testEmail,
+        password: 'differentPassword'
       }
     });
 
     expect(duplicateResponse.status()).toBe(409);
     const data = await duplicateResponse.json();
-    expect(data.error).toBe('Username already exists');
+    expect(data.error).toBe('Email already exists');
   });
 
   test('should fail to login with incorrect password', async ({ request }) => {
     // Register user
     await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: testPassword,
-        email: testEmail
+        firstName: testFirstName,
+        lastName: testLastName,
+        email: testEmail,
+        password: testPassword
       }
     });
 
     // Try to login with wrong password
     const loginResponse = await request.post('/api/auth/login', {
       data: {
-        username: testUsername,
+        email: testEmail,
         password: 'wrongPassword123'
       }
     });
 
     expect(loginResponse.status()).toBe(401);
     const data = await loginResponse.json();
-    expect(data.error).toBe('Invalid username or password');
+    expect(data.error).toBe('Invalid email or password');
   });
 
   test('should verify token after registration', async ({ request }) => {
     // Register user
     const registerResponse = await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: testPassword,
-        email: testEmail
+        firstName: testFirstName,
+        lastName: testLastName,
+        email: testEmail,
+        password: testPassword
       }
     });
 
@@ -159,16 +169,19 @@ test.describe('Authentication', () => {
 
     expect(verifyData.valid).toBe(true);
     expect(verifyData.user).toBeDefined();
-    expect(verifyData.user.username).toBe(testUsername);
+    expect(verifyData.user.firstName).toBe(testFirstName);
+    expect(verifyData.user.lastName).toBe(testLastName);
+    expect(verifyData.user.email).toBe(testEmail);
   });
 
   test('should get user info with valid token', async ({ request }) => {
     // Register user
     const registerResponse = await request.post('/api/auth/register', {
       data: {
-        username: testUsername,
-        password: testPassword,
-        email: testEmail
+        firstName: testFirstName,
+        lastName: testLastName,
+        email: testEmail,
+        password: testPassword
       }
     });
 
@@ -187,7 +200,8 @@ test.describe('Authentication', () => {
     const userData = await meResponse.json();
 
     expect(userData.id).toBe(userId);
-    expect(userData.username).toBe(testUsername);
+    expect(userData.firstName).toBe(testFirstName);
+    expect(userData.lastName).toBe(testLastName);
     expect(userData.email).toBe(testEmail);
     expect(userData.createdAt).toBeDefined();
     expect(userData.lastLogin).toBeDefined();

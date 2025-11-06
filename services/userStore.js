@@ -2,21 +2,23 @@
 const prisma = require('./prisma');
 
 class UserStore {
-  async createUser({ username, password, email }) {
+  async createUser({ firstName, lastName, email, password }) {
     const user = await prisma.user.create({
       data: {
-        username: username.toLowerCase(),
+        firstName,
+        lastName,
+        email: email.toLowerCase(),
         password,
-        email,
         lastLogin: new Date(),
       },
     });
 
     return {
       id: user.id,
-      username: user.username,
-      password: user.password,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
+      password: user.password,
       createdAt: user.createdAt.toISOString(),
       lastLogin: user.lastLogin.toISOString(),
     };
@@ -31,26 +33,28 @@ class UserStore {
 
     return {
       id: user.id,
-      username: user.username,
-      password: user.password,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
+      password: user.password,
       createdAt: user.createdAt.toISOString(),
       lastLogin: user.lastLogin.toISOString(),
     };
   }
 
-  async getUserByUsername(username) {
+  async getUserByEmail(email) {
     const user = await prisma.user.findUnique({
-      where: { username: username.toLowerCase() },
+      where: { email: email.toLowerCase() },
     });
 
     if (!user) return null;
 
     return {
       id: user.id,
-      username: user.username,
-      password: user.password,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
+      password: user.password,
       createdAt: user.createdAt.toISOString(),
       lastLogin: user.lastLogin.toISOString(),
     };
@@ -67,7 +71,8 @@ class UserStore {
     const users = await prisma.user.findMany({
       select: {
         id: true,
-        username: true,
+        firstName: true,
+        lastName: true,
         email: true,
         createdAt: true,
         lastLogin: true,
@@ -76,7 +81,8 @@ class UserStore {
 
     return users.map(user => ({
       id: user.id,
-      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
       email: user.email,
       createdAt: user.createdAt.toISOString(),
       lastLogin: user.lastLogin.toISOString(),
