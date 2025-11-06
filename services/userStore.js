@@ -1,5 +1,3 @@
-const { v4: uuidv4 } = require('crypto');
-
 // In-memory user storage
 // In production, replace this with a proper database (MongoDB, PostgreSQL, etc.)
 class UserStore {
