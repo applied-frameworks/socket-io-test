@@ -32,7 +32,24 @@ npm run db:push      # Push schema changes to database
 npm run db:studio    # Open Prisma Studio (database GUI)
 npm run db:generate  # Regenerate Prisma Client
 npm run db:reset     # Reset database (deletes all data)
+npm run db:seed      # Seed database with test users
 ```
+
+### Database Seeding
+The project includes a seed file (`prisma/seed.js`) that creates test users for development and testing:
+
+**Test Users:**
+- Admin: `admin` / `admin`
+- User1: `user1` / `user1`
+- User2: `user2` / `user2`
+
+**Usage:**
+```bash
+npm run db:seed      # Create test users (idempotent - safe to run multiple times)
+npx prisma db seed   # Alternative command
+```
+
+The seed script is **idempotent** - it checks if each user exists before creating them, so it's safe to run multiple times without duplicating data or affecting existing users.
 
 ### Environment Setup
 Create `.env` from `.env.example`:

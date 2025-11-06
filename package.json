@@ -15,7 +15,8 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "db:reset": "rm -f prisma/dev.db prisma/dev.db-journal && prisma db push"
+    "db:reset": "rm -f prisma/dev.db prisma/dev.db-journal && prisma db push",
+    "db:seed": "node prisma/seed.js"
   },
   "keywords": [
     "socket.io",
@@ -45,5 +46,8 @@
   },
   "engines": {
     "node": "18.x"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
