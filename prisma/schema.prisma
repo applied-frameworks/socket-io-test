@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String        @id @default(cuid())
+  username      String        @unique
+  email         String?
+  password      String
+  createdAt     DateTime      @default(now())
+  lastLogin     DateTime      @default(now())
+
+  // Relations
+  canvasUsers   CanvasUser[]
+  shapes        Shape[]
+  drawEvents    DrawEvent[]
+
+  @@map("users")
+}
+
+model Canvas {
+  id            String        @id @default(cuid())
+  name          String        @unique @default("default-canvas")
+  createdAt     DateTime      @default(now())
+  lastModified  DateTime      @updatedAt
+
+  // Relations
+  canvasUsers   CanvasUser[]
+  shapes        Shape[]
+  drawEvents    DrawEvent[]
+
+  @@map("canvases")
+}
+
+model CanvasUser {
+  id        String    @id @default(cuid())
+  userId    String
+  canvasId  String
+  joinedAt  DateTime  @default(now())
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canvas    Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, canvasId])
+  @@map("canvas_users")
+}
+
+model Shape {
+  id        String    @id @default(cuid())
+  canvasId  String
+  userId    String
+  type      String
+  data      String    // JSON string
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  canvas    Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([canvasId])
+  @@map("shapes")
+}
+
+model DrawEvent {
+  id        String    @id @default(cuid())
+  canvasId  String
+  userId    String
+  data      String    // JSON string
+  timestamp DateTime  @default(now())
+
+  // Relations
+  canvas    Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([canvasId, timestamp])
+  @@map("draw_events")
+}

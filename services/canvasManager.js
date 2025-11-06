@@ -1,148 +1,251 @@
-// Canvas Manager - Handles canvas state and operations
-// In production, persist this to a database
+// Canvas Manager - Database-backed with Prisma
+// Hybrid approach: Active users in-memory, persistent data in database
+const prisma = require('./prisma');
 
 class CanvasManager {
   constructor() {
-    this.canvases = new Map();
+    // In-memory cache for active users (ephemeral)
+    this.activeUsers = new Map(); // Map<canvasId, Map<userId, userInfo>>
+    // In-memory buffer for draw events (for performance)
+    this.drawEventBuffers = new Map(); // Map<canvasId, Array<drawEvent>>
   }
 
   // Get or create canvas state
-  getCanvasState(canvasId) {
-    if (!this.canvases.has(canvasId)) {
-      this.canvases.set(canvasId, {
-        id: canvasId,
-        shapes: [],
-        drawEvents: [],
-        users: new Map(),
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString()
+  async getCanvasState(canvasId) {
+    // Ensure canvas exists in database
+    let canvas = await prisma.canvas.findUnique({
+      where: { name: canvasId },
+      include: {
+        shapes: {
+          orderBy: { createdAt: 'asc' },
+        },
+        drawEvents: {
+          orderBy: { timestamp: 'desc' },
+          take: 100, // Last 100 draw events
+        },
+      },
+    });
+
+    if (!canvas) {
+      canvas = await prisma.canvas.create({
+        data: { name: canvasId },
+        include: {
+          shapes: true,
+          drawEvents: true,
+        },
       });
     }
-    
-    const canvas = this.canvases.get(canvasId);
+
+    // Initialize active users cache if needed
+    if (!this.activeUsers.has(canvasId)) {
+      this.activeUsers.set(canvasId, new Map());
+    }
+
+    // Get buffered draw events
+    const bufferedEvents = this.drawEventBuffers.get(canvasId) || [];
+
     return {
       id: canvas.id,
-      shapes: canvas.shapes,
-      drawEvents: canvas.drawEvents.slice(-100), // Last 100 draw events
-      users: Array.from(canvas.users.values()),
-      lastModified: canvas.lastModified
+      shapes: canvas.shapes.map(s => ({
+        ...JSON.parse(s.data),
+        id: s.id,
+      })),
+      drawEvents: [...canvas.drawEvents.map(e => JSON.parse(e.data)), ...bufferedEvents].slice(-100),
+      users: Array.from(this.activeUsers.get(canvasId).values()),
+      lastModified: canvas.lastModified.toISOString(),
     };
   }
 
-  // Add a draw event
-  addDrawEvent(canvasId, drawData) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      canvas.drawEvents.push(drawData);
-      canvas.lastModified = new Date().toISOString();
-      
-      // Keep only last 1000 draw events to prevent memory issues
-      if (canvas.drawEvents.length > 1000) {
-        canvas.drawEvents = canvas.drawEvents.slice(-1000);
-      }
+  // Add a draw event (buffered for performance)
+  async addDrawEvent(canvasId, drawData) {
+    const canvas = await this._ensureCanvas(canvasId);
+
+    // Add to buffer
+    if (!this.drawEventBuffers.has(canvasId)) {
+      this.drawEventBuffers.set(canvasId, []);
+    }
+
+    const buffer = this.drawEventBuffers.get(canvasId);
+    buffer.push(drawData);
+
+    // Periodically flush buffer to database (every 50 events or 10 seconds)
+    if (buffer.length >= 50) {
+      await this._flushDrawEvents(canvasId, canvas.id);
+    }
+  }
+
+  async _flushDrawEvents(canvasId, dbCanvasId) {
+    const buffer = this.drawEventBuffers.get(canvasId);
+    if (!buffer || buffer.length === 0) return;
+
+    await prisma.drawEvent.createMany({
+      data: buffer.map(event => ({
+        canvasId: dbCanvasId,
+        userId: event.userId,
+        data: JSON.stringify(event),
+      })),
+    });
+
+    // Clear buffer and keep only last 100
+    this.drawEventBuffers.set(canvasId, []);
+
+    // Clean up old draw events (keep only last 1000)
+    const oldEvents = await prisma.drawEvent.findMany({
+      where: { canvasId: dbCanvasId },
+      orderBy: { timestamp: 'desc' },
+      skip: 1000,
+      select: { id: true },
+    });
+
+    if (oldEvents.length > 0) {
+      await prisma.drawEvent.deleteMany({
+        where: {
+          id: { in: oldEvents.map(e => e.id) },
+        },
+      });
     }
   }
 
   // Add a shape
-  addShape(canvasId, shapeData) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      canvas.shapes.push({
-        ...shapeData,
-        id: shapeData.id || this.generateShapeId()
-      });
-      canvas.lastModified = new Date().toISOString();
-    }
+  async addShape(canvasId, shapeData) {
+    const canvas = await this._ensureCanvas(canvasId);
+
+    await prisma.shape.create({
+      data: {
+        canvasId: canvas.id,
+        userId: shapeData.userId,
+        type: shapeData.type || 'unknown',
+        data: JSON.stringify(shapeData),
+      },
+    });
   }
 
   // Update a shape
-  updateShape(canvasId, shapeId, updates) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      const shapeIndex = canvas.shapes.findIndex(s => s.id === shapeId);
-      if (shapeIndex !== -1) {
-        canvas.shapes[shapeIndex] = {
-          ...canvas.shapes[shapeIndex],
-          ...updates,
-          id: shapeId // Preserve original ID
-        };
-        canvas.lastModified = new Date().toISOString();
-      }
+  async updateShape(canvasId, shapeId, updates) {
+    const existingShape = await prisma.shape.findUnique({
+      where: { id: shapeId },
+    });
+
+    if (existingShape) {
+      const currentData = JSON.parse(existingShape.data);
+      const updatedData = { ...currentData, ...updates, id: shapeId };
+
+      await prisma.shape.update({
+        where: { id: shapeId },
+        data: {
+          data: JSON.stringify(updatedData),
+        },
+      });
     }
   }
 
   // Delete a shape
-  deleteShape(canvasId, shapeId) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      canvas.shapes = canvas.shapes.filter(s => s.id !== shapeId);
-      canvas.lastModified = new Date().toISOString();
-    }
+  async deleteShape(canvasId, shapeId) {
+    await prisma.shape.delete({
+      where: { id: shapeId },
+    }).catch(() => {
+      // Shape might not exist, ignore error
+    });
   }
 
   // Clear canvas
-  clearCanvas(canvasId) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      canvas.shapes = [];
-      canvas.drawEvents = [];
-      canvas.lastModified = new Date().toISOString();
-    }
+  async clearCanvas(canvasId) {
+    const canvas = await this._ensureCanvas(canvasId);
+
+    await prisma.shape.deleteMany({
+      where: { canvasId: canvas.id },
+    });
+
+    await prisma.drawEvent.deleteMany({
+      where: { canvasId: canvas.id },
+    });
+
+    // Clear buffers
+    this.drawEventBuffers.set(canvasId, []);
   }
 
-  // Add user to canvas
+  // Add user to canvas (in-memory only - ephemeral)
   addUser(canvasId, userId, username) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      canvas.users.set(userId, {
-        userId,
-        username,
-        joinedAt: new Date().toISOString()
-      });
+    if (!this.activeUsers.has(canvasId)) {
+      this.activeUsers.set(canvasId, new Map());
     }
+
+    this.activeUsers.get(canvasId).set(userId, {
+      userId,
+      username,
+      joinedAt: new Date().toISOString(),
+    });
   }
 
-  // Remove user from canvas
+  // Remove user from canvas (in-memory)
   removeUser(canvasId, userId) {
-    const canvas = this.canvases.get(canvasId);
-    if (canvas) {
-      canvas.users.delete(userId);
+    if (this.activeUsers.has(canvasId)) {
+      this.activeUsers.get(canvasId).delete(userId);
     }
   }
 
-  // Get canvas users
+  // Get canvas users (in-memory)
   getCanvasUsers(canvasId) {
-    const canvas = this.canvases.get(canvasId);
-    return canvas ? Array.from(canvas.users.values()) : [];
+    if (!this.activeUsers.has(canvasId)) {
+      return [];
+    }
+    return Array.from(this.activeUsers.get(canvasId).values());
   }
 
   // Get all canvases (for admin purposes)
-  getAllCanvases() {
-    return Array.from(this.canvases.values()).map(canvas => ({
+  async getAllCanvases() {
+    const canvases = await prisma.canvas.findMany({
+      include: {
+        _count: {
+          select: { shapes: true },
+        },
+      },
+    });
+
+    return canvases.map(canvas => ({
       id: canvas.id,
-      shapeCount: canvas.shapes.length,
-      userCount: canvas.users.size,
-      createdAt: canvas.createdAt,
-      lastModified: canvas.lastModified
+      name: canvas.name,
+      shapeCount: canvas._count.shapes,
+      userCount: this.activeUsers.get(canvas.name)?.size || 0,
+      createdAt: canvas.createdAt.toISOString(),
+      lastModified: canvas.lastModified.toISOString(),
     }));
   }
 
   // Delete old canvases (cleanup job)
-  cleanupOldCanvases(maxAgeHours = 24) {
-    const now = new Date();
-    const cutoffTime = new Date(now - maxAgeHours * 60 * 60 * 1000);
+  async cleanupOldCanvases(maxAgeHours = 24) {
+    const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
 
-    for (const [canvasId, canvas] of this.canvases.entries()) {
-      const lastModified = new Date(canvas.lastModified);
-      if (lastModified < cutoffTime && canvas.users.size === 0) {
-        this.canvases.delete(canvasId);
-        console.log(`Cleaned up canvas: ${canvasId}`);
+    const oldCanvases = await prisma.canvas.findMany({
+      where: {
+        lastModified: { lt: cutoffTime },
+      },
+    });
+
+    for (const canvas of oldCanvases) {
+      const hasActiveUsers = this.activeUsers.get(canvas.name)?.size > 0;
+      if (!hasActiveUsers) {
+        await prisma.canvas.delete({
+          where: { id: canvas.id },
+        });
+        console.log(`Cleaned up canvas: ${canvas.name}`);
       }
     }
   }
 
-  generateShapeId() {
-    return `shape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // Helper to ensure canvas exists
+  async _ensureCanvas(canvasId) {
+    let canvas = await prisma.canvas.findUnique({
+      where: { name: canvasId },
+    });
+
+    if (!canvas) {
+      canvas = await prisma.canvas.create({
+        data: { name: canvasId },
+      });
+    }
+
+    return canvas;
   }
 }
 
@@ -153,5 +256,14 @@ const canvasManager = new CanvasManager();
 setInterval(() => {
   canvasManager.cleanupOldCanvases(24);
 }, 60 * 60 * 1000);
+
+// Flush draw events periodically
+setInterval(() => {
+  for (const [canvasId] of canvasManager.drawEventBuffers) {
+    canvasManager._ensureCanvas(canvasId).then(canvas => {
+      canvasManager._flushDrawEvents(canvasId, canvas.id);
+    });
+  }
+}, 10 * 1000); // Every 10 seconds
 
 module.exports = canvasManager;

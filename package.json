@@ -4,8 +4,18 @@
   "description": "Realtime collaborative drawing backend with Socket.IO",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "concurrently \"node server.js\" \"http-server client -p 8000 -c-1\"",
+    "dev": "concurrently \"nodemon server.js\" \"http-server client -p 8000 -c-1\"",
+    "server": "node server.js",
+    "server:dev": "nodemon server.js",
+    "client": "http-server client -p 8000 -c-1",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "db:reset": "rm -f prisma/dev.db prisma/dev.db-journal && prisma db push"
   },
   "keywords": [
     "socket.io",
@@ -16,16 +26,21 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.6.1",
+    "@prisma/client": "^6.19.0",
     "bcrypt": "^5.1.1",
-    "jsonwebtoken": "^9.0.2",
-    "dotenv": "^16.3.1",
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5"
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.19.0",
+    "socket.io": "^4.6.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "concurrently": "^9.2.1",
+    "http-server": "^14.1.1",
     "nodemon": "^3.0.2"
   },
   "engines": {

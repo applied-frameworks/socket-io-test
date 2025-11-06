@@ -1,65 +1,97 @@
-// In-memory user storage
-// In production, replace this with a proper database (MongoDB, PostgreSQL, etc.)
+// Database-backed user storage using Prisma
+const prisma = require('./prisma');
+
 class UserStore {
-  constructor() {
-    this.users = new Map();
-    this.usersByUsername = new Map();
-  }
+  async createUser({ username, password, email }) {
+    const user = await prisma.user.create({
+      data: {
+        username,
+        password,
+        email,
+        lastLogin: new Date(),
+      },
+    });
 
-  createUser({ username, password, email }) {
-    const user = {
-      id: this.generateUserId(),
-      username,
-      password,
-      email,
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
+    return {
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: user.lastLogin.toISOString(),
     };
-
-    this.users.set(user.id, user);
-    this.usersByUsername.set(username.toLowerCase(), user);
-
-    return user;
   }
 
-  getUserById(userId) {
-    return this.users.get(userId);
+  async getUserById(userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: user.lastLogin.toISOString(),
+    };
   }
 
-  getUserByUsername(username) {
-    return this.usersByUsername.get(username.toLowerCase());
+  async getUserByUsername(username) {
+    const user = await prisma.user.findUnique({
+      where: { username: username.toLowerCase() },
+    });
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      username: user.username,
+      password: user.password,
+      email: user.email,
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: user.lastLogin.toISOString(),
+    };
   }
 
-  updateLastLogin(userId) {
-    const user = this.users.get(userId);
-    if (user) {
-      user.lastLogin = new Date().toISOString();
-    }
+  async updateLastLogin(userId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastLogin: new Date() },
+    });
   }
 
-  getAllUsers() {
-    return Array.from(this.users.values()).map(user => ({
+  async getAllUsers() {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        createdAt: true,
+        lastLogin: true,
+      },
+    });
+
+    return users.map(user => ({
       id: user.id,
       username: user.username,
       email: user.email,
-      createdAt: user.createdAt,
-      lastLogin: user.lastLogin
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: user.lastLogin.toISOString(),
     }));
   }
 
-  deleteUser(userId) {
-    const user = this.users.get(userId);
-    if (user) {
-      this.usersByUsername.delete(user.username.toLowerCase());
-      this.users.delete(userId);
+  async deleteUser(userId) {
+    try {
+      await prisma.user.delete({
+        where: { id: userId },
+      });
       return true;
+    } catch (error) {
+      return false;
     }
-    return false;
-  }
-
-  generateUserId() {
-    // Simple ID generation - in production use UUID or database auto-increment
-    return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 }
 

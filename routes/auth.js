@@ -30,10 +30,10 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = userStore.getUserByUsername(username);
+    const existingUser = await userStore.getUserByUsername(username);
     if (existingUser) {
-      return res.status(409).json({ 
-        error: 'Username already exists' 
+      return res.status(409).json({
+        error: 'Username already exists'
       });
     }
 
@@ -41,7 +41,7 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = userStore.createUser({
+    const user = await userStore.createUser({
       username,
       password: hashedPassword,
       email: email || null
@@ -84,23 +84,23 @@ router.post('/login', async (req, res) => {
     }
 
     // Get user
-    const user = userStore.getUserByUsername(username);
+    const user = await userStore.getUserByUsername(username);
     if (!user) {
-      return res.status(401).json({ 
-        error: 'Invalid username or password' 
+      return res.status(401).json({
+        error: 'Invalid username or password'
       });
     }
 
     // Verify password
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(401).json({ 
-        error: 'Invalid username or password' 
+      return res.status(401).json({
+        error: 'Invalid username or password'
       });
     }
 
     // Update last login
-    userStore.updateLastLogin(user.id);
+    await userStore.updateLastLogin(user.id);
 
     // Generate token
     const token = jwt.sign(
@@ -138,9 +138,9 @@ router.get('/verify', authenticateToken, (req, res) => {
 });
 
 // Get current user info
-router.get('/me', authenticateToken, (req, res) => {
-  const user = userStore.getUserById(req.user.userId);
-  
+router.get('/me', authenticateToken, async (req, res) => {
+  const user = await userStore.getUserById(req.user.userId);
+
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }

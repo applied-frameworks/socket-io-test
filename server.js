@@ -67,21 +67,24 @@ io.on('connection', (socket) => {
   socket.on('canvas:join', (canvasId) => {
     socket.join(canvasId);
     socket.currentCanvas = canvasId;
-    
+
+    // Add user to canvas
+    canvasManager.addUser(canvasId, socket.user.userId, socket.user.username);
+
     // Send current canvas state to the newly joined user
     const canvasState = canvasManager.getCanvasState(canvasId);
     socket.emit('canvas:state', canvasState);
-    
+
     // Notify others in the room
     socket.to(canvasId).emit('user:joined', {
       userId: socket.user.userId,
       username: socket.user.username
     });
-    
-    // Send list of active users in this canvas
+
+    // Send updated list of active users to everyone in the room
     const users = canvasManager.getCanvasUsers(canvasId);
-    socket.emit('canvas:users', users);
-    
+    io.to(canvasId).emit('canvas:users', users);
+
     console.log(`${socket.user.username} joined canvas: ${canvasId}`);
   });
 
@@ -181,14 +184,18 @@ io.on('connection', (socket) => {
   // Disconnection
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.user.username} (${socket.id})`);
-    
+
     if (socket.currentCanvas) {
       socket.to(socket.currentCanvas).emit('user:left', {
         userId: socket.user.userId,
         username: socket.user.username
       });
-      
+
       canvasManager.removeUser(socket.currentCanvas, socket.user.userId);
+
+      // Send updated users list to everyone remaining in the room
+      const users = canvasManager.getCanvasUsers(socket.currentCanvas);
+      io.to(socket.currentCanvas).emit('canvas:users', users);
     }
   });
 
