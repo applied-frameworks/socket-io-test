@@ -64,6 +64,43 @@ npm run dev
 
 Server will be running at `http://localhost:3000`
 
+## Testing
+
+This project includes automated tests using Playwright.
+
+### Running Tests
+
+**IMPORTANT**: UI tests require both the backend server (port 3000) and frontend client (port 8000) to be running.
+
+1. **Start the dev servers** (in a separate terminal):
+```bash
+npm run dev
+```
+
+2. **Wait for both servers to be ready**:
+   - Backend: `http://localhost:3000`
+   - Frontend: `http://localhost:8000`
+
+3. **Run the tests**:
+```bash
+npm test              # Run all tests
+npm run test:ui       # Run tests in UI mode
+npm run test:report   # View test report
+```
+
+### Test Suites
+
+- **API Tests** (`tests/auth.spec.js`): Tests authentication endpoints (register, login, token verification)
+- **UI Tests** (`tests/ui-auth-flow.spec.js`): Tests complete signup/login/logout flow through the UI
+
+### Prerequisites
+
+Ensure your database is set up before running tests:
+```bash
+npm run db:push       # Sync database schema
+npm run db:seed       # (Optional) Seed test users
+```
+
 ## API Endpoints
 
 ### Authentication

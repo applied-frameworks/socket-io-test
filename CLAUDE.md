@@ -13,9 +13,9 @@ This is a Socket.IO-based realtime collaborative canvas backend with JWT authent
 ## Development Commands
 
 ### Prerequisites
-This project requires Node.js 18.x. If using nvm:
+This project requires Node.js 22.x. If using nvm:
 ```bash
-nvm use 18           # Switch to Node 18
+nvm use 22           # Switch to Node 22
 ```
 
 ### Running the Application
@@ -51,6 +51,35 @@ npx prisma db seed   # Alternative command
 
 The seed script is **idempotent** - it checks if each user exists before creating them, so it's safe to run multiple times without duplicating data or affecting existing users.
 
+### Testing Commands
+
+**IMPORTANT**: UI tests require both the backend server (port 3000) and frontend client (port 8000) to be running.
+
+```bash
+# Start both servers before running tests (required for UI tests)
+npm run dev          # In a separate terminal - starts backend + frontend
+
+# Run all tests (API + UI)
+npm test             # Runs all Playwright tests
+npx playwright test  # Alternative command
+
+# Run tests with UI mode
+npm run test:ui      # Interactive test runner
+
+# View test report
+npm run test:report  # Open HTML test report
+```
+
+**Test Suites:**
+- **API Tests** (`tests/auth.spec.js`): Authentication endpoints - can run without servers
+- **UI Tests** (`tests/ui-auth-flow.spec.js`): Full signup/login flow - **requires servers running**
+
+**Running Tests Workflow:**
+1. Ensure database is set up: `npm run db:push`
+2. Start dev servers: `npm run dev` (in separate terminal)
+3. Wait for servers to be ready (backend on port 3000, frontend on port 8000)
+4. Run tests: `npm test`
+
 ### Environment Setup
 Create `.env` from `.env.example`:
 ```bash
@@ -71,9 +100,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
 ```
 
-### Testing the Server
+### Health Check
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3000/health  # Verify backend server is running
 ```
 
 ## Architecture
@@ -207,6 +236,7 @@ datasource db {
 
 - **Database**: SQLite for local dev (`prisma/dev.db`), PostgreSQL for production
 - **Prisma Client**: Auto-generated after schema changes - run `npm run db:generate` if needed
+- **Testing**: UI tests require both backend (port 3000) and frontend (port 8000) servers running via `npm run dev`
 - JWT_SECRET and DATABASE_URL must be set in production
 - Draw events persisted but limited to last 1000 per canvas
 - Active users are in-memory only (not persisted to database)
