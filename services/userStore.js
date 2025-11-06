@@ -5,7 +5,7 @@ class UserStore {
   async createUser({ username, password, email }) {
     const user = await prisma.user.create({
       data: {
-        username,
+        username: username.toLowerCase(),
         password,
         email,
         lastLogin: new Date(),

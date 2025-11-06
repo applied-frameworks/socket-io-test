@@ -8,9 +8,10 @@ test.describe('Authentication', () => {
   test.beforeEach(() => {
     // Generate unique credentials for each test run
     const timestamp = Date.now();
-    testUsername = `testuser_${timestamp}`;
+    const random = Math.random().toString(36).substring(7);
+    testUsername = `testuser_${timestamp}_${random}`;
     testPassword = 'testPassword123';
-    testEmail = `test_${timestamp}@example.com`;
+    testEmail = `test_${timestamp}_${random}@example.com`;
   });
 
   test('should successfully sign up a new user', async ({ request }) => {
