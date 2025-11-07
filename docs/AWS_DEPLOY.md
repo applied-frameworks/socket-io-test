@@ -14,6 +14,407 @@ The GitHub Actions workflow (`.github/workflows/deploy-aws.yml`) handles this co
 
 This ensures built files are included in deployments but excluded from version control.
 
+## Deploying Additional Environments
+
+This section provides a complete guide for deploying additional environments (staging, production, etc.) following the patterns established in this project.
+
+### Multi-Environment Strategy
+
+The project supports multiple environments with:
+- **Branch-based deployment**: Each git branch deploys to its corresponding environment
+- **Environment isolation**: Separate RDS databases, SSL certificates, and configuration per environment
+- **Automated CI/CD**: GitHub Actions automatically deploys when you push to tracked branches
+- **Consistent naming**: All resources include the environment name for easy identification
+
+**Current Setup:**
+- `main` branch → `socket-io-canvas-dev` environment → `https://labs-dev.appliedframeworks.com`
+- `staging` branch → `socket-io-canvas-staging` environment → `https://staging-labs.appliedframeworks.com`
+
+### Complete Deployment Checklist
+
+Use this checklist when deploying a new environment (e.g., production):
+
+#### 1. Generate Secrets
+
+```bash
+# Generate unique JWT secret for the environment
+export JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
+echo "JWT_SECRET=$JWT_SECRET"  # SAVE THIS!
+
+# Generate secure database password (hex encoding - no special chars)
+export DB_PASSWORD=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+echo "DB_PASSWORD=$DB_PASSWORD"  # SAVE THIS!
+```
+
+**IMPORTANT**: Save these values immediately. You'll need them for environment configuration.
+
+#### 2. Create Git Branch
+
+```bash
+# Create and push new branch from main
+git checkout main
+git pull origin main
+git checkout -b production  # Or your environment name
+git push -u origin production
+```
+
+#### 3. Create RDS PostgreSQL Database
+
+```bash
+# Replace 'production' with your environment name
+aws rds create-db-instance \
+  --db-instance-identifier socket-io-canvas-production-db \
+  --db-instance-class db.t3.micro \
+  --engine postgres \
+  --engine-version 17.4 \
+  --master-username postgres \
+  --master-user-password "$DB_PASSWORD" \
+  --allocated-storage 20 \
+  --db-name socketio_canvas_production \
+  --backup-retention-period 7 \
+  --no-publicly-accessible \
+  --region us-east-2
+
+# Wait for database to be available (~5 minutes)
+aws rds wait db-instance-available --db-instance-identifier socket-io-canvas-production-db
+
+# Get database endpoint
+export DB_ENDPOINT=$(aws rds describe-db-instances \
+  --db-instance-identifier socket-io-canvas-production-db \
+  --query 'DBInstances[0].Endpoint.Address' \
+  --output text)
+
+# Build DATABASE_URL
+export DATABASE_URL="postgresql://postgres:$DB_PASSWORD@$DB_ENDPOINT:5432/socketio_canvas_production"
+echo "DATABASE_URL=$DATABASE_URL"  # SAVE THIS!
+```
+
+#### 4. Request SSL Certificate
+
+```bash
+# Request certificate for your custom domain
+aws acm request-certificate \
+  --domain-name your-production-domain.com \
+  --subject-alternative-names "*.your-production-domain.com" \
+  --validation-method DNS \
+  --region us-east-2
+
+# Get certificate ARN from output
+export CERT_ARN="arn:aws:acm:us-east-2:ACCOUNT_ID:certificate/CERT_ID"
+
+# Get DNS validation records
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --region us-east-2 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
+```
+
+**Action Required**: Add the CNAME record to your DNS provider for certificate validation.
+
+**Wait for certificate validation:**
+```bash
+# Check status (should show "ISSUED" when ready)
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --region us-east-2 \
+  --query 'Certificate.Status' \
+  --output text
+```
+
+#### 5. Create Elastic Beanstalk Environment
+
+```bash
+export PATH="/Users/YOUR_USERNAME/.ebcli-virtual-env/executables:$PATH"
+
+# Create LoadBalanced environment (recommended for production)
+eb create socket-io-canvas-production \
+  --instance-type t3.micro \
+  --elb-type application
+```
+
+**Note**: Initial deployment may fail - this is expected. Environment variables will be configured next.
+
+#### 6. Update EB CLI Configuration
+
+```bash
+# Edit .elasticbeanstalk/config.yml
+```
+
+Add your branch to `branch-defaults`:
+```yaml
+branch-defaults:
+  main:
+    environment: socket-io-canvas-dev
+  staging:
+    environment: socket-io-canvas-staging
+  production:  # Add your new environment
+    environment: socket-io-canvas-production
+```
+
+**Commit this change:**
+```bash
+git add .elasticbeanstalk/config.yml
+git commit -m "Add production environment to EB CLI config"
+git push origin production
+```
+
+#### 7. Configure DNS
+
+Add CNAME record in Route53 (or your DNS provider):
+
+```bash
+# Get your load balancer URL
+eb status | grep CNAME
+# Output: CNAME: socket-io-canvas-production.elasticbeanstalk.com
+```
+
+**DNS Configuration:**
+- Record Type: `CNAME`
+- Name: `your-subdomain` (e.g., `app` or `prod`)
+- Value: `socket-io-canvas-production.elasticbeanstalk.com`
+- TTL: `300` (5 minutes)
+
+**Verify DNS propagation:**
+```bash
+dig +short your-subdomain.your-domain.com
+# Should return: socket-io-canvas-production.elasticbeanstalk.com
+```
+
+#### 8. Configure Security Groups
+
+```bash
+# Get EB security group
+export EB_SG=$(aws ec2 describe-security-groups \
+  --filters "Name=group-name,Values=*socket-io-canvas-production*" \
+  --query 'SecurityGroups[0].GroupId' \
+  --output text)
+
+# Get RDS security group
+export RDS_SG=$(aws rds describe-db-instances \
+  --db-instance-identifier socket-io-canvas-production-db \
+  --query 'DBInstances[0].VpcSecurityGroups[0].VpcSecurityGroupId' \
+  --output text)
+
+# Allow EB to connect to RDS on port 5432
+aws ec2 authorize-security-group-ingress \
+  --group-id $RDS_SG \
+  --protocol tcp \
+  --port 5432 \
+  --source-group $EB_SG
+```
+
+#### 9. Configure Environment Variables
+
+```bash
+export CLIENT_URL="https://your-subdomain.your-domain.com"
+
+eb use socket-io-canvas-production
+eb setenv \
+  NODE_ENV=production \
+  JWT_SECRET="$JWT_SECRET" \
+  DATABASE_URL="$DATABASE_URL" \
+  CLIENT_URL="$CLIENT_URL" \
+  NPM_USE_PRODUCTION=false
+```
+
+**IMPORTANT**: `NPM_USE_PRODUCTION=false` ensures Prisma dependencies are installed.
+
+#### 10. Configure HTTPS Listener
+
+```bash
+# Wait for environment to be Ready
+aws elasticbeanstalk describe-environments \
+  --environment-names socket-io-canvas-production \
+  --region us-east-2 \
+  --query 'Environments[0].Status' \
+  --output text
+
+# Configure HTTPS listener with SSL certificate
+aws elasticbeanstalk update-environment \
+  --environment-name socket-io-canvas-production \
+  --region us-east-2 \
+  --option-settings \
+    Namespace=aws:elbv2:listener:443,OptionName=Protocol,Value=HTTPS \
+    Namespace=aws:elbv2:listener:443,OptionName=SSLCertificateArns,Value=$CERT_ARN \
+    Namespace=aws:elbv2:listener:443,OptionName=DefaultProcess,Value=default
+```
+
+#### 11. Update GitHub Actions Workflow
+
+Edit `.github/workflows/deploy-aws.yml`:
+
+```yaml
+- name: Set environment based on branch
+  id: set-env
+  run: |
+    if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+      echo "env_name=socket-io-canvas-dev" >> $GITHUB_OUTPUT
+      echo "env_url=https://labs-dev.appliedframeworks.com" >> $GITHUB_OUTPUT
+    elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
+      echo "env_name=socket-io-canvas-staging" >> $GITHUB_OUTPUT
+      echo "env_url=https://staging-labs.appliedframeworks.com" >> $GITHUB_OUTPUT
+    elif [ "${{ github.ref }}" == "refs/heads/production" ]; then
+      echo "env_name=socket-io-canvas-production" >> $GITHUB_OUTPUT
+      echo "env_url=https://your-subdomain.your-domain.com" >> $GITHUB_OUTPUT
+    fi
+```
+
+**Commit and push:**
+```bash
+git add .github/workflows/deploy-aws.yml
+git commit -m "Add production environment to GitHub Actions workflow"
+git push origin production
+```
+
+This triggers automatic deployment via GitHub Actions.
+
+#### 12. Verify Deployment
+
+```bash
+# Check deployment status
+gh run list --branch production --limit 1
+
+# Verify environment health
+aws elasticbeanstalk describe-environments \
+  --environment-names socket-io-canvas-production \
+  --region us-east-2 \
+  --query 'Environments[0].[Status,Health,HealthStatus]' \
+  --output text
+
+# Test backend API
+curl -I https://your-subdomain.your-domain.com/health
+
+# Test frontend
+curl -I https://your-subdomain.your-domain.com/
+```
+
+**Expected Results:**
+- Environment Status: `Ready`
+- Environment Health: `Green`
+- Backend API: `HTTP/2 200`
+- Frontend: `HTTP/2 200` with `content-type: text/html`
+
+### Naming Conventions
+
+Follow these patterns for consistency:
+
+| Resource Type | Pattern | Examples |
+|--------------|---------|----------|
+| Git Branch | `{env}` | `main`, `staging`, `production` |
+| EB Environment | `socket-io-canvas-{env}` | `socket-io-canvas-dev`, `socket-io-canvas-staging` |
+| RDS Instance | `socket-io-canvas-{env}-db` | `socket-io-canvas-production-db` |
+| Database Name | `socketio_canvas_{env}` | `socketio_canvas_production` |
+| Custom Domain | `{env}-labs.appliedframeworks.com` OR `{subdomain}.your-domain.com` | `staging-labs.appliedframeworks.com`, `app.your-domain.com` |
+
+### Environment-Specific Configuration
+
+**NODE_ENV Values:**
+- Development: `development` or `staging`
+- Production: `production`
+
+**CRITICAL**: Ensure `server.js` serves static files for your NODE_ENV value:
+
+```javascript
+// server.js line 70
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+  const clientBuildPath = path.join(__dirname, 'client', 'dist');
+  app.use(express.static(clientBuildPath));
+  // ...
+}
+```
+
+**If adding a new NODE_ENV value**, update this condition to include it.
+
+### Common Pitfalls and Solutions
+
+#### 1. Build Artifacts in Git
+**Problem**: Accidentally committing `client/dist/` files to version control.
+
+**Solution**:
+- **NEVER** commit build artifacts to git
+- Ensure `dist/` is in `.gitignore`
+- GitHub Actions builds the client and includes it in deployment zip
+- Deployment zip includes `client/dist/` but excludes `client/src/*`
+
+**If you committed dist files by mistake:**
+```bash
+git reset --hard HEAD~1  # Undo last commit
+git push --force origin your-branch  # Force push to remove from remote
+```
+
+#### 2. Frontend Returns 404
+**Problem**: Backend API works but frontend returns 404 errors.
+
+**Root Cause**: `server.js` doesn't serve static files for your NODE_ENV value.
+
+**Solution**: Update `server.js` line 70 to include your NODE_ENV:
+```javascript
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'your-env') {
+```
+
+#### 3. RDS Connection Fails
+**Problem**: Application can't connect to RDS database.
+
+**Solution**: Verify security group configuration:
+```bash
+# Check if EB security group is authorized to access RDS
+aws ec2 describe-security-groups --group-ids $RDS_SG \
+  --query 'SecurityGroups[0].IpPermissions'
+```
+
+Should show ingress rule from EB security group on port 5432.
+
+#### 4. Invalid Database Password
+**Problem**: RDS creation fails with "not a valid password" error.
+
+**Cause**: Password contains special characters (`/`, `@`, `"`, ` `, `+`, `=`)
+
+**Solution**: Use hex encoding instead of base64:
+```bash
+node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+```
+
+#### 5. Certificate Validation Timeout
+**Problem**: SSL certificate stuck in "Pending Validation" status.
+
+**Solution**: Verify DNS CNAME record is correctly configured:
+```bash
+dig +short _validation-string.your-domain.com CNAME
+```
+
+Should return the ACM validation target.
+
+#### 6. Environment Not Ready for HTTPS Configuration
+**Problem**: HTTPS listener configuration fails with "invalid state" error.
+
+**Solution**: Wait for environment to reach "Ready" status:
+```bash
+aws elasticbeanstalk describe-environments \
+  --environment-names socket-io-canvas-{env} \
+  --region us-east-2 \
+  --query 'Environments[0].Status' \
+  --output text
+```
+
+Only proceed when status is `Ready`.
+
+### Deployment Workflow Summary
+
+1. Generate secrets (JWT_SECRET, DB_PASSWORD)
+2. Create git branch
+3. Create RDS database (parallel)
+4. Request SSL certificate (parallel)
+5. Create EB environment (parallel)
+6. Update EB CLI config
+7. Configure DNS
+8. Configure security groups
+9. Set environment variables
+10. Configure HTTPS listener
+11. Update GitHub Actions workflow
+12. Verify deployment
+
+**Parallel steps** (3-5) can run simultaneously to save time.
+
 ## Prerequisites
 
 1. **AWS Account** with billing enabled
