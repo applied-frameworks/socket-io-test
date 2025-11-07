@@ -25,7 +25,7 @@ echo "Installing client dependencies..."
 cd client
 echo "Current directory: $(pwd)"
 echo "package.json exists: $(ls -la package.json 2>/dev/null || echo 'NOT FOUND')"
-npm install
+npm install --include=dev
 
 # Build the client
 echo "Building client production bundle..."
