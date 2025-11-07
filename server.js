@@ -24,9 +24,24 @@ const io = new Server(server, {
   pingInterval: 25000
 });
 
-// Middleware
+// Middleware - Configure Helmet for HTTP compatibility
 app.use(helmet({
-  originAgentCluster: false  // Disable to avoid conflicts with reverse proxies
+  originAgentCluster: false,  // Disable to avoid conflicts with reverse proxies
+  crossOriginOpenerPolicy: false,  // Disable - requires HTTPS
+  crossOriginResourcePolicy: false,  // Disable - requires HTTPS
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
 }));
 app.use(cors({
   origin: process.env.CLIENT_URL || '*',
