@@ -13,6 +13,7 @@
     "client:preview": "cd client && npm run preview",
     "install:client": "cd client && npm install",
     "test": "playwright test",
+    "test:api": "playwright test tests/auth.spec.js",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
     "db:push": "prisma db push",
