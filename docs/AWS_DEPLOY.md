@@ -2,6 +2,18 @@
 
 This guide covers deploying the Socket.IO collaborative canvas application to AWS using Elastic Beanstalk with CLI commands and automated GitHub Actions deployment.
 
+## Important: Build Artifacts
+
+**DO NOT commit `client/dist/` files to git.** Build artifacts should never be in version control.
+
+The GitHub Actions workflow (`.github/workflows/deploy-aws.yml`) handles this correctly by:
+1. Building the frontend during deployment (`npm run client:build`)
+2. Including `client/dist/` in the deployment zip
+3. Excluding `client/src/` (source files) from the deployment zip
+4. Keeping `dist/` in `.gitignore` (never committed to git)
+
+This ensures built files are included in deployments but excluded from version control.
+
 ## Prerequisites
 
 1. **AWS Account** with billing enabled
