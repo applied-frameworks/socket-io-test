@@ -208,7 +208,7 @@ This application can be deployed to multiple platforms. See detailed deployment 
 **Quick Setup:**
 1. Set GitHub secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 2. Create Elastic Beanstalk application: `socket-io-canvas`
-3. Create environment: `socket-io-canvas-prod`
+3. Create environment: `socket-io-canvas-dev`
 4. Configure environment variables (JWT_SECRET, DATABASE_URL, CLIENT_URL, NODE_ENV)
 5. Push to `main` branch - GitHub Actions handles deployment
 
