@@ -28,6 +28,11 @@ jobs:
         env:
           DATABASE_URL: "file:./dev.db"
 
+      - name: Create database schema
+        run: npx prisma db push --accept-data-loss
+        env:
+          DATABASE_URL: "file:./dev.db"
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
