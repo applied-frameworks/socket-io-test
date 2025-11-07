@@ -73,15 +73,25 @@ Options:
 2. `.elasticbeanstalk/config.yml` - Added dev branch mapping to socket-io-canvas-dev
 3. Main branch now deploys to `socket-io-canvas-prod` (updated from socket-io-canvas-dev)
 
+## Setup Status
+
+✅ **COMPLETED** - Dev environment is fully configured and deployed
+
+- SSL Certificate: **ISSUED**
+- Database: **socket-io-canvas-dev-db** (PostgreSQL 17.4, db.t3.micro)
+- Environment: **Ready** with **Green** health
+- Deployment: Successful with database schema initialized
+
 ## Post-Setup Verification
 
-After DNS and certificate are configured:
+After DNS domain mapping is complete:
 
-1. Wait for SSL certificate status to change from PENDING_VALIDATION to ISSUED
-2. Verify HTTPS listener is configured on load balancer
-3. Push to dev branch to trigger deployment
-4. Verify application is accessible at https://dev-labs.appliedframeworks.com
-5. Test WebSocket connections work properly over HTTPS
+1. ✅ SSL certificate validated and ISSUED
+2. ✅ HTTPS listener configured on load balancer
+3. ✅ Application deployed and running
+4. ⏳ Add DNS CNAME: `dev-labs.appliedframeworks.com` → `socket-io-canvas-dev.eba-p7pycbaa.us-east-2.elasticbeanstalk.com`
+5. ⏳ Verify application is accessible at https://dev-labs.appliedframeworks.com
+6. ⏳ Test WebSocket connections work properly over HTTPS
 
 ## Notes
 
