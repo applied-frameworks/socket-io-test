@@ -8,8 +8,10 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
+const shapesRoutes = require('./routes/shapes');
 const { authenticateSocket } = require('./middleware/auth');
 const canvasManager = require('./services/canvasManager');
+const documentManager = require('./services/documentManager');
 
 const app = express();
 const server = http.createServer(app);
@@ -93,6 +95,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/shapes', shapesRoutes);
 
 // Serve static files from the client build folder in production or staging
 if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
@@ -125,7 +128,102 @@ io.on('connection', (socket) => {
     email: socket.user.email
   });
 
-  // Join a canvas room
+  // Join a document room
+  socket.on('document:join', async (data) => {
+    const { documentId } = data;
+    socket.join(documentId);
+    socket.currentDocument = documentId;
+
+    const userInfo = {
+      firstName: socket.user.firstName,
+      lastName: socket.user.lastName,
+      email: socket.user.email
+    };
+
+    // Add user to document
+    documentManager.addUser(documentId, socket.user.userId, userInfo);
+
+    // Send current document state to the newly joined user
+    try {
+      const documentState = await documentManager.getDocumentState(documentId);
+      socket.emit('document:state', documentState);
+
+      // Notify others in the room
+      socket.to(documentId).emit('user:joined', {
+        userId: socket.user.userId,
+        ...userInfo
+      });
+
+      // Send updated list of active users to everyone in the room
+      const users = documentManager.getDocumentUsers(documentId);
+      io.to(documentId).emit('document:users', users);
+
+      console.log(`${userInfo.firstName} ${userInfo.lastName} joined document: ${documentId}`);
+    } catch (error) {
+      console.error('Error joining document:', error);
+      socket.emit('error', { message: 'Failed to join document' });
+    }
+  });
+
+  // Document shape events
+  socket.on('shape:add', async (data) => {
+    try {
+      const shape = await documentManager.addShape(socket.currentDocument, {
+        ...data,
+        userId: socket.user.userId
+      });
+
+      // Broadcast to others in the document
+      socket.to(socket.currentDocument).emit('shape:add', shape);
+    } catch (error) {
+      console.error('Error adding shape:', error);
+      socket.emit('error', { message: 'Failed to add shape' });
+    }
+  });
+
+  socket.on('shape:update', async (data) => {
+    try {
+      const { id, ...updates } = data;
+      const shape = await documentManager.updateShape(socket.currentDocument, id, updates);
+
+      // Broadcast to others in the document
+      socket.to(socket.currentDocument).emit('shape:update', shape);
+    } catch (error) {
+      console.error('Error updating shape:', error);
+      socket.emit('error', { message: 'Failed to update shape' });
+    }
+  });
+
+  socket.on('shape:delete', async (data) => {
+    try {
+      const { id } = data;
+      await documentManager.deleteShape(socket.currentDocument, id);
+
+      // Broadcast to others in the document
+      socket.to(socket.currentDocument).emit('shape:delete', { id });
+    } catch (error) {
+      console.error('Error deleting shape:', error);
+      socket.emit('error', { message: 'Failed to delete shape' });
+    }
+  });
+
+  socket.on('document:clear', async () => {
+    try {
+      await documentManager.clearDocument(socket.currentDocument);
+
+      // Broadcast to everyone in the document
+      io.to(socket.currentDocument).emit('document:clear', {
+        userId: socket.user.userId,
+        firstName: socket.user.firstName,
+        lastName: socket.user.lastName
+      });
+    } catch (error) {
+      console.error('Error clearing document:', error);
+      socket.emit('error', { message: 'Failed to clear document' });
+    }
+  });
+
+  // Join a canvas room (backward compatibility)
   socket.on('canvas:join', (canvasId) => {
     socket.join(canvasId);
     socket.currentCanvas = canvasId;
@@ -257,6 +355,22 @@ io.on('connection', (socket) => {
     const userFullName = `${socket.user.firstName} ${socket.user.lastName}`;
     console.log(`User disconnected: ${userFullName} (${socket.id})`);
 
+    // Handle document disconnection
+    if (socket.currentDocument) {
+      socket.to(socket.currentDocument).emit('user:left', {
+        userId: socket.user.userId,
+        firstName: socket.user.firstName,
+        lastName: socket.user.lastName
+      });
+
+      documentManager.removeUser(socket.currentDocument, socket.user.userId);
+
+      // Send updated users list to everyone remaining in the room
+      const users = documentManager.getDocumentUsers(socket.currentDocument);
+      io.to(socket.currentDocument).emit('document:users', users);
+    }
+
+    // Handle canvas disconnection (backward compatibility)
     if (socket.currentCanvas) {
       socket.to(socket.currentCanvas).emit('user:left', {
         userId: socket.user.userId,

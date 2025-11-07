@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import DocumentCanvas from '../components/DocumentCanvas'
+import '../styles/Editor.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -90,11 +92,12 @@ const Editor = () => {
       </div>
 
       <div className="editor-content">
-        <div className="editor-placeholder">
-          <h2>Document Editor</h2>
-          <p>Canvas editor will be implemented here</p>
-          <p className="editor-meta">Document ID: {documentId}</p>
-        </div>
+        {document && user && (
+          <DocumentCanvas
+            documentId={documentId}
+            userId={user.id}
+          />
+        )}
       </div>
     </div>
   )

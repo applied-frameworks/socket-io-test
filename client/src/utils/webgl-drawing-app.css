@@ -1,0 +1,38 @@
+/**
+ * WebGL Drawing App Styles
+ * Selection box and resize handles for shape manipulation
+ */
+
+.selection-box {
+  position: absolute;
+  border: 2px dashed #4CAF50;
+  pointer-events: none;
+  z-index: 1000;
+  box-sizing: border-box;
+}
+
+.selection-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #4CAF50;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-sizing: border-box;
+  z-index: 1001;
+  cursor: pointer;
+}
+
+.selection-handle:hover {
+  background: #45a049;
+  transform: scale(1.2);
+}
+
+/* Preview canvas (overlays main canvas) */
+#preview-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 999;
+}

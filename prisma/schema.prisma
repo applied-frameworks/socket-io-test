@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,80 +8,94 @@ datasource db {
 }
 
 model User {
-  id            String          @id @default(cuid())
+  id            String         @id @default(cuid())
   firstName     String
   lastName      String
-  email         String          @unique
+  email         String         @unique
   password      String
-  createdAt     DateTime        @default(now())
-  lastLogin     DateTime        @default(now())
-
-  // Relations
-  documents     Document[]
+  createdAt     DateTime       @default(now())
+  lastLogin     DateTime       @default(now())
   documentUsers DocumentUser[]
-  shapes        Shape[]
+  documents     Document[]
   drawEvents    DrawEvent[]
+  shapes        Shape[]
 
   @@map("users")
 }
 
 model Document {
-  id            String          @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String
   ownerId       String
-  createdAt     DateTime        @default(now())
-  lastModified  DateTime        @updatedAt
-
-  // Relations
-  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime       @default(now())
+  lastModified  DateTime       @updatedAt
   documentUsers DocumentUser[]
-  shapes        Shape[]
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   drawEvents    DrawEvent[]
+  shapes        Shape[]
 
   @@map("documents")
 }
 
 model DocumentUser {
-  id          String    @id @default(cuid())
-  userId      String
-  documentId  String
-  joinedAt    DateTime  @default(now())
-
-  // Relations
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  documentId String
+  joinedAt   DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, documentId])
   @@map("document_users")
 }
 
 model Shape {
-  id          String    @id @default(cuid())
-  documentId  String
-  userId      String
-  type        String
-  data        String    // JSON string
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  documentId   String
+  userId       String
+  type         String    // 'rectangle', 'triangle', 'ellipse', 'brush', 'eraser'
+
+  // Shape coordinates (for rectangle, triangle, ellipse)
+  x1           Float?
+  y1           Float?
+  x2           Float?
+  y2           Float?
+
+  // Styling
+  strokeColor  String?   // JSON: {r, g, b, a}
+  fillColor    String?   // JSON: {r, g, b, a}
+  strokeSize   Float?
+  customLabel  String?
+
+  // Stroke points (for brush, eraser)
+  points       String?   // JSON array: [{x, y}, ...]
+
+  // Layering
+  order        Int       @default(0)
+
+  // Additional data (for extensibility)
+  data         String?   // JSON string for any additional properties
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
+  @@index([documentId, order])
   @@map("shapes")
 }
 
 model DrawEvent {
-  id          String    @id @default(cuid())
-  documentId  String
-  userId      String
-  data        String    // JSON string
-  timestamp   DateTime  @default(now())
-
-  // Relations
-  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  data       String
+  timestamp  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId, timestamp])
   @@map("draw_events")
