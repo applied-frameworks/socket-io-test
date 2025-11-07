@@ -25,7 +25,9 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  originAgentCluster: false  // Disable to avoid conflicts with reverse proxies
+}));
 app.use(cors({
   origin: process.env.CLIENT_URL || '*',
   credentials: true
