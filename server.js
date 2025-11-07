@@ -66,8 +66,8 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 
-// Serve static files from the client build folder in production
-if (process.env.NODE_ENV === 'production') {
+// Serve static files from the client build folder in production or staging
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
   const clientBuildPath = path.join(__dirname, 'client', 'dist');
   app.use(express.static(clientBuildPath));
 
