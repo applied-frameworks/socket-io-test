@@ -6,83 +6,86 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String        @id @default(cuid())
+  id            String          @id @default(cuid())
   firstName     String
   lastName      String
-  email         String        @unique
+  email         String          @unique
   password      String
-  createdAt     DateTime      @default(now())
-  lastLogin     DateTime      @default(now())
+  createdAt     DateTime        @default(now())
+  lastLogin     DateTime        @default(now())
 
   // Relations
-  canvasUsers   CanvasUser[]
+  documents     Document[]
+  documentUsers DocumentUser[]
   shapes        Shape[]
   drawEvents    DrawEvent[]
 
   @@map("users")
 }
 
-model Canvas {
-  id            String        @id @default(cuid())
-  name          String        @unique @default("default-canvas")
-  createdAt     DateTime      @default(now())
-  lastModified  DateTime      @updatedAt
+model Document {
+  id            String          @id @default(cuid())
+  name          String
+  ownerId       String
+  createdAt     DateTime        @default(now())
+  lastModified  DateTime        @updatedAt
 
   // Relations
-  canvasUsers   CanvasUser[]
+  owner         User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  documentUsers DocumentUser[]
   shapes        Shape[]
   drawEvents    DrawEvent[]
 
-  @@map("canvases")
+  @@map("documents")
 }
 
-model CanvasUser {
-  id        String    @id @default(cuid())
-  userId    String
-  canvasId  String
-  joinedAt  DateTime  @default(now())
+model DocumentUser {
+  id          String    @id @default(cuid())
+  userId      String
+  documentId  String
+  joinedAt    DateTime  @default(now())
 
   // Relations
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  canvas    Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, canvasId])
-  @@map("canvas_users")
+  @@unique([userId, documentId])
+  @@map("document_users")
 }
 
 model Shape {
-  id        String    @id @default(cuid())
-  canvasId  String
-  userId    String
-  type      String
-  data      String    // JSON string
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  documentId  String
+  userId      String
+  type        String
+  data        String    // JSON string
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Relations
-  canvas    Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([canvasId])
+  @@index([documentId])
   @@map("shapes")
 }
 
 model DrawEvent {
-  id        String    @id @default(cuid())
-  canvasId  String
-  userId    String
-  data      String    // JSON string
-  timestamp DateTime  @default(now())
+  id          String    @id @default(cuid())
+  documentId  String
+  userId      String
+  data        String    // JSON string
+  timestamp   DateTime  @default(now())
 
   // Relations
-  canvas    Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document    Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([canvasId, timestamp])
+  @@index([documentId, timestamp])
   @@map("draw_events")
 }

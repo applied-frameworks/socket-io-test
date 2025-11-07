@@ -7,16 +7,41 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
+const documentRoutes = require('./routes/documents');
 const { authenticateSocket } = require('./middleware/auth');
 const canvasManager = require('./services/canvasManager');
 
 const app = express();
 const server = http.createServer(app);
 
+// CORS origin configuration
+// In development: allow localhost with any port
+// In staging/production: only allow specified CLIENT_URL
+const corsOrigin = (origin, callback) => {
+  const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
+  if (isDevelopment) {
+    // Allow any localhost origin in development
+    if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  } else {
+    // In staging/production, only allow the specific CLIENT_URL
+    const allowedOrigin = process.env.CLIENT_URL;
+    if (origin === allowedOrigin || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
+
 // CORS configuration
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || '*',
+    origin: corsOrigin,
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -42,17 +67,19 @@ app.use(helmet({
   },
 }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || '*',
+  origin: corsOrigin,
   credentials: true
 }));
 app.use(express.json());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use('/api/', limiter);
+// Rate limiting (disabled for testing)
+if (process.env.NODE_ENV !== 'test') {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100 // limit each IP to 100 requests per windowMs
+  });
+  app.use('/api/', limiter);
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -65,6 +92,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Serve static files from the client build folder in production or staging
 if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Home from './pages/Home'
 import Signup from './pages/Signup'
 import Landing from './pages/Landing'
+import Editor from './pages/Editor'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -53,6 +54,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Landing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/editor/:documentId"
+            element={
+              <ProtectedRoute>
+                <Editor />
               </ProtectedRoute>
             }
           />
