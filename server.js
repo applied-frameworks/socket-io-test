@@ -40,8 +40,10 @@ app.use(helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
+      upgradeInsecureRequests: null,  // Disable - only works with HTTPS
     },
   },
+  hsts: false,  // Disable HSTS for HTTP
 }));
 app.use(cors({
   origin: process.env.CLIENT_URL || '*',
