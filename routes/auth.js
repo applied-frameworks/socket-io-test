@@ -86,6 +86,9 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error message:', error.message);
+    console.error('Error name:', error.name);
     res.status(500).json({
       error: 'Internal server error during registration'
     });
