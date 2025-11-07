@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - staging
+      - dev
   workflow_dispatch:
 
 jobs:
@@ -19,11 +20,14 @@ jobs:
         id: set-env
         run: |
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "env_name=socket-io-canvas-dev" >> $GITHUB_OUTPUT
-            echo "env_url=https://labs-dev.appliedframeworks.com" >> $GITHUB_OUTPUT
+            echo "env_name=socket-io-canvas-prod" >> $GITHUB_OUTPUT
+            echo "env_url=https://labs.appliedframeworks.com" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
             echo "env_name=socket-io-canvas-staging" >> $GITHUB_OUTPUT
             echo "env_url=https://staging-labs.appliedframeworks.com" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+            echo "env_name=socket-io-canvas-dev" >> $GITHUB_OUTPUT
+            echo "env_url=https://dev-labs.appliedframeworks.com" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup Node.js
