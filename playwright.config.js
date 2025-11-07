@@ -12,7 +12,7 @@ module.exports = defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npm start',
+    command: 'npm run server',
     url: 'http://localhost:3000/health',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
