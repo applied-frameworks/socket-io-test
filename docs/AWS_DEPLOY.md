@@ -98,14 +98,29 @@ eb init socket-io-canvas \
   --region us-east-2
 ```
 
-**Create development environment:**
+**Choose environment type:**
+
+**Option A: SingleInstance (Development/Testing)**
 ```bash
 eb create socket-io-canvas-dev \
   --instance-type t3.micro \
   --single
 ```
+- **Pros:** Lower cost (~$5/month), simpler setup
+- **Cons:** No load balancer, no auto-scaling, no HTTPS at load balancer, single point of failure
+- **Use for:** Development, testing, personal projects
 
-The `--single` flag creates a single-instance environment (no load balancer, saves ~$16/month). For production environments with load balancing, omit this flag.
+**Option B: LoadBalanced (Production)**
+```bash
+eb create socket-io-canvas-prod \
+  --instance-type t3.micro \
+  --elb-type application
+```
+- **Pros:** Auto-scaling, high availability, HTTPS/SSL support, sticky sessions for WebSockets
+- **Cons:** Higher cost (~$30-50/month with load balancer)
+- **Use for:** Production, staging, public-facing applications
+
+**IMPORTANT:** Environment type cannot be changed after creation. To switch from SingleInstance to LoadBalanced, you must create a new environment.
 
 ### 4. Configure Environment Variables
 
@@ -164,6 +179,149 @@ aws ec2 authorize-security-group-ingress \
   --source-group $EB_SG
 ```
 
+## HTTPS and Custom Domain Setup (LoadBalanced Only)
+
+**Prerequisites:**
+- LoadBalanced environment (Application Load Balancer)
+- Custom domain with DNS access
+- AWS Certificate Manager permissions
+
+### 1. Request SSL Certificate
+
+**Using AWS Certificate Manager (ACM):**
+```bash
+# Request certificate for your domain
+aws acm request-certificate \
+  --domain-name your-domain.com \
+  --subject-alternative-names "*.your-domain.com" \
+  --validation-method DNS \
+  --region us-east-2
+
+# Get certificate ARN from output
+export CERT_ARN="arn:aws:acm:us-east-2:ACCOUNT_ID:certificate/CERT_ID"
+```
+
+**Important:** Certificate must be in the same region as your Elastic Beanstalk environment.
+
+### 2. Validate Certificate via DNS
+
+```bash
+# Get DNS validation records
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --region us-east-2 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
+```
+
+**Add the CNAME record to your DNS provider:**
+- Record Type: CNAME
+- Name: `_validation-string.your-domain.com`
+- Value: `_validation-target.acm-validations.aws.`
+
+**Wait for validation (1-30 minutes):**
+```bash
+# Check certificate status
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --region us-east-2 \
+  --query 'Certificate.Status'
+
+# Should return: "ISSUED"
+```
+
+### 3. Configure HTTPS Listener
+
+**Add HTTPS listener to your LoadBalanced environment:**
+```bash
+aws elasticbeanstalk update-environment \
+  --environment-name socket-io-canvas-prod \
+  --region us-east-2 \
+  --option-settings \
+    Namespace=aws:elbv2:listener:443,OptionName=Protocol,Value=HTTPS \
+    Namespace=aws:elbv2:listener:443,OptionName=SSLCertificateArns,Value=$CERT_ARN \
+    Namespace=aws:elbv2:listener:443,OptionName=DefaultProcess,Value=default
+```
+
+**Or create a config file** `.ebextensions/https-listener.config`:
+```yaml
+option_settings:
+  # HTTPS Listener Configuration
+  aws:elbv2:listener:443:
+    Protocol: HTTPS
+    SSLCertificateArns: arn:aws:acm:us-east-2:ACCOUNT_ID:certificate/CERT_ID
+    DefaultProcess: default
+
+  # Keep HTTP listener for redirects
+  aws:elbv2:listener:80:
+    Protocol: HTTP
+    DefaultProcess: default
+```
+
+**Then deploy:**
+```bash
+eb deploy
+```
+
+### 4. Configure DNS CNAME Record
+
+**Get your load balancer URL:**
+```bash
+eb status | grep CNAME
+# Output: CNAME: socket-io-canvas-prod.elasticbeanstalk.com
+```
+
+**Add CNAME record to your DNS provider:**
+- Record Type: CNAME
+- Name: `app` (or subdomain of choice)
+- Value: `socket-io-canvas-prod.elasticbeanstalk.com`
+- TTL: 300 (5 minutes)
+
+**Example:** `app.your-domain.com` → `socket-io-canvas-prod.elasticbeanstalk.com`
+
+### 5. Update Environment Variables
+
+**Update CLIENT_URL to use HTTPS:**
+```bash
+eb setenv CLIENT_URL="https://app.your-domain.com"
+```
+
+### 6. Verify HTTPS Configuration
+
+**Test the setup:**
+```bash
+# Check HTTP (should work)
+curl -I http://app.your-domain.com
+
+# Check HTTPS (should work with valid SSL)
+curl -I https://app.your-domain.com
+
+# Verify SSL certificate
+openssl s_client -connect app.your-domain.com:443 -servername app.your-domain.com
+```
+
+### Troubleshooting HTTPS
+
+**Certificate mismatch error:**
+- Ensure certificate domain matches your CNAME record
+- Certificate must be in `ISSUED` status
+- DNS must be fully propagated
+
+**Connection timeout:**
+- Verify load balancer security group allows inbound traffic on port 443
+- Check HTTPS listener is configured correctly:
+  ```bash
+  aws elasticbeanstalk describe-configuration-settings \
+    --environment-name socket-io-canvas-prod \
+    --application-name socket-io-canvas \
+    --region us-east-2 \
+    --query "ConfigurationSettings[0].OptionSettings[?Namespace=='aws:elbv2:listener:443']"
+  ```
+
+**Mixed content warnings:**
+- Ensure all resources load over HTTPS
+- Update `CLIENT_URL` to use HTTPS
+- Check browser console for insecure resource warnings
+
 ## GitHub Actions Setup
 
 **Add secrets using GitHub CLI:**
@@ -182,8 +340,10 @@ gh secret set AWS_SECRET_ACCESS_KEY
 
 **Verify workflow configuration** in `.github/workflows/deploy-aws.yml` matches your setup:
 - `application_name: socket-io-canvas`
-- `environment_name: socket-io-canvas-dev`
+- `environment_name: socket-io-canvas-prod` (or your environment name)
 - `region: us-east-2`
+
+**Note:** Update `environment_name` in the workflow to match your target environment (dev, staging, or prod).
 
 **Deploy:**
 ```bash
