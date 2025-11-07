@@ -4,7 +4,7 @@
   "description": "Realtime collaborative drawing backend with Socket.IO",
   "main": "server.js",
   "scripts": {
-    "start": "concurrently \"node server.js\" \"npm run client:build && npm run client:preview\"",
+    "start": "node server.js",
     "dev": "concurrently \"nodemon server.js\" \"npm run client:dev\"",
     "server": "node server.js",
     "server:dev": "nodemon server.js",

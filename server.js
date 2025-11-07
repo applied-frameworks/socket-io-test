@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -49,6 +50,21 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+
+// Serve static files from the client build folder in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, 'client', 'dist');
+  app.use(express.static(clientBuildPath));
+
+  // Catch-all route to serve index.html for client-side routing
+  app.get('*', (req, res) => {
+    // Don't serve index.html for API routes or Socket.IO
+    if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 // Socket.IO authentication middleware
 io.use(authenticateSocket);
