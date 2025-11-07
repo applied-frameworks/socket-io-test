@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - staging
   workflow_dispatch:
 
 jobs:
@@ -13,6 +14,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set environment based on branch
+        id: set-env
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "env_name=socket-io-canvas-dev" >> $GITHUB_OUTPUT
+            echo "env_url=https://labs-dev.appliedframeworks.com" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
+            echo "env_name=socket-io-canvas-staging" >> $GITHUB_OUTPUT
+            echo "env_url=https://staging-labs.appliedframeworks.com" >> $GITHUB_OUTPUT
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -67,7 +79,7 @@ jobs:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           application_name: socket-io-canvas
-          environment_name: socket-io-canvas-dev
+          environment_name: ${{ steps.set-env.outputs.env_name }}
           region: us-east-2
           version_label: ${{ github.sha }}-${{ steps.timestamp.outputs.time }}
           deployment_package: deploy.zip
@@ -78,4 +90,5 @@ jobs:
         if: success()
         run: |
           echo "Deployment completed successfully!"
-          echo "Application URL: https://labs-dev.appliedframeworks.com"
+          echo "Environment: ${{ steps.set-env.outputs.env_name }}"
+          echo "Application URL: ${{ steps.set-env.outputs.env_url }}"
