@@ -47,3 +47,8 @@ playwright/.cache/
 
 # Temporary/Debug files
 check-users.js
+
+# AWS Elastic Beanstalk
+.elasticbeanstalk/
+deploy.zip
+*.zip

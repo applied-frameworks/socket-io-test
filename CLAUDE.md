@@ -196,17 +196,24 @@ curl http://localhost:3000/health  # Verify backend server is running
 
 ## Deployment
 
-**Heroku**: Uses `Procfile` (`web: node server.js`)
+This application can be deployed to multiple platforms. See detailed deployment guides in the `docs/` folder:
 
-Required config vars:
-```bash
-heroku config:set JWT_SECRET=<generated-secret>
-heroku config:set NODE_ENV=production
-heroku config:set CLIENT_URL=https://your-frontend-url.com
-heroku config:set DATABASE_URL=<postgresql-connection-string>
-```
+### AWS Elastic Beanstalk (Recommended)
+- **Full guide**: [docs/AWS_DEPLOY.md](docs/AWS_DEPLOY.md)
+- **GitHub Actions**: Automated deployment on push to `main` (`.github/workflows/deploy-aws.yml`)
+- **Configuration**: See `.ebextensions/` and `.platform/` for Elastic Beanstalk settings
+- **Database**: Supports AWS RDS PostgreSQL or SQLite
+- **WebSocket**: Nginx configured for Socket.IO WebSocket upgrade
 
-**Port**: Reads from `process.env.PORT` (Heroku dynamically assigns this)
+**Quick Setup:**
+1. Set GitHub secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+2. Create Elastic Beanstalk application: `socket-io-canvas`
+3. Create environment: `socket-io-canvas-prod`
+4. Configure environment variables (JWT_SECRET, DATABASE_URL, CLIENT_URL, NODE_ENV)
+5. Push to `main` branch - GitHub Actions handles deployment
+
+
+**Port**: Reads from `process.env.PORT` (dynamically assigned by platform)
 
 ## PostgreSQL Migration (Production)
 
