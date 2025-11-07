@@ -71,7 +71,7 @@ jobs:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           application_name: socket-io-canvas
-          environment_name: socket-io-canvas-dev
+          environment_name: socket-io-canvas-prod
           region: us-east-2
           version_label: ${{ github.sha }}-${{ steps.timestamp.outputs.time }}
           deployment_package: deploy.zip
@@ -82,4 +82,4 @@ jobs:
         if: success()
         run: |
           echo "Deployment completed successfully!"
-          echo "Application URL: http://socket-io-canvas-dev.us-east-2.elasticbeanstalk.com"
+          echo "Application URL: https://labs-dev.appliedframeworks.com"
