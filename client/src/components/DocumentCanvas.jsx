@@ -66,6 +66,9 @@ const DocumentCanvas = ({ documentId, userId }) => {
         userId,
         socket: socketRef.current
       })
+
+      // Setup toolbar event listeners
+      setupToolbarListeners()
     })
 
     return () => {
@@ -75,6 +78,102 @@ const DocumentCanvas = ({ documentId, userId }) => {
       }
     }
   }, [documentId, userId])
+
+  // Setup toolbar button listeners
+  const setupToolbarListeners = () => {
+    // Tool buttons
+    const toolButtons = {
+      'select-btn': 'select',
+      'brush-btn': 'brush',
+      'eraser-btn': 'eraser',
+      'rectangle-btn': 'rectangle',
+      'triangle-btn': 'triangle',
+      'ellipse-btn': 'ellipse'
+    }
+
+    Object.entries(toolButtons).forEach(([btnId, tool]) => {
+      const btn = document.getElementById(btnId)
+      if (btn) {
+        btn.addEventListener('click', () => {
+          if (appRef.current) {
+            appRef.current.setTool(tool)
+
+            // Update active button state
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'))
+            btn.classList.add('active')
+          }
+        })
+      }
+    })
+
+    // Color pickers
+    const colorPicker = document.getElementById('color-picker')
+    if (colorPicker) {
+      colorPicker.addEventListener('input', (e) => {
+        if (appRef.current) {
+          appRef.current.setStrokeColor(e.target.value)
+        }
+      })
+    }
+
+    const fillPicker = document.getElementById('fill-picker')
+    if (fillPicker) {
+      fillPicker.addEventListener('input', (e) => {
+        if (appRef.current) {
+          appRef.current.setFillColor(e.target.value)
+        }
+      })
+    }
+
+    // Opacity sliders
+    const strokeOpacitySlider = document.getElementById('stroke-opacity-slider')
+    if (strokeOpacitySlider) {
+      strokeOpacitySlider.addEventListener('input', (e) => {
+        if (appRef.current) {
+          appRef.current.setStrokeOpacity(parseInt(e.target.value))
+        }
+      })
+    }
+
+    const fillOpacitySlider = document.getElementById('fill-opacity-slider')
+    if (fillOpacitySlider) {
+      fillOpacitySlider.addEventListener('input', (e) => {
+        if (appRef.current) {
+          appRef.current.setFillOpacity(parseInt(e.target.value))
+        }
+      })
+    }
+
+    // Size slider
+    const sizeSlider = document.getElementById('size-slider')
+    if (sizeSlider) {
+      sizeSlider.addEventListener('input', (e) => {
+        if (appRef.current) {
+          appRef.current.setBrushSize(parseInt(e.target.value))
+        }
+      })
+    }
+
+    // Clear button
+    const clearBtn = document.getElementById('clear-btn')
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (appRef.current && confirm('Clear the entire canvas? This cannot be undone.')) {
+          appRef.current.clearCanvas()
+        }
+      })
+    }
+
+    // Delete button (for selected shapes)
+    const deleteBtn = document.getElementById('delete-btn')
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        if (appRef.current) {
+          appRef.current.deleteSelectedShape()
+        }
+      })
+    }
+  }
 
   return (
     <div id="container" ref={containerRef}>

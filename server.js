@@ -262,8 +262,8 @@ io.on('connection', (socket) => {
       timestamp: Date.now()
     };
 
-    socket.to(socket.currentCanvas).emit('draw:start', drawData);
-    canvasManager.addDrawEvent(socket.currentCanvas, drawData);
+    socket.to(socket.currentDocument).emit('draw:start', drawData);
+    canvasManager.addDrawEvent(socket.currentDocument, drawData);
   });
 
   socket.on('draw:move', (data) => {
@@ -272,8 +272,8 @@ io.on('connection', (socket) => {
       userId: socket.user.userId,
       timestamp: Date.now()
     };
-    
-    socket.to(socket.currentCanvas).emit('draw:move', drawData);
+
+    socket.to(socket.currentDocument).emit('draw:move', drawData);
   });
 
   socket.on('draw:end', (data) => {
@@ -282,53 +282,13 @@ io.on('connection', (socket) => {
       userId: socket.user.userId,
       timestamp: Date.now()
     };
-    
-    socket.to(socket.currentCanvas).emit('draw:end', drawData);
-  });
 
-  // Shape events
-  socket.on('shape:add', (data) => {
-    const shapeData = {
-      ...data,
-      userId: socket.user.userId,
-      firstName: socket.user.firstName,
-      lastName: socket.user.lastName,
-      timestamp: Date.now()
-    };
-
-    socket.to(socket.currentCanvas).emit('shape:add', shapeData);
-    canvasManager.addShape(socket.currentCanvas, shapeData);
-  });
-
-  socket.on('shape:update', (data) => {
-    const shapeData = {
-      ...data,
-      userId: socket.user.userId,
-      timestamp: Date.now()
-    };
-    
-    socket.to(socket.currentCanvas).emit('shape:update', shapeData);
-    canvasManager.updateShape(socket.currentCanvas, data.shapeId, shapeData);
-  });
-
-  socket.on('shape:delete', (data) => {
-    socket.to(socket.currentCanvas).emit('shape:delete', data);
-    canvasManager.deleteShape(socket.currentCanvas, data.shapeId);
-  });
-
-  // Clear canvas
-  socket.on('canvas:clear', () => {
-    socket.to(socket.currentCanvas).emit('canvas:clear', {
-      userId: socket.user.userId,
-      firstName: socket.user.firstName,
-      lastName: socket.user.lastName
-    });
-    canvasManager.clearCanvas(socket.currentCanvas);
+    socket.to(socket.currentDocument).emit('draw:end', drawData);
   });
 
   // Cursor position
   socket.on('cursor:move', (data) => {
-    socket.to(socket.currentCanvas).emit('cursor:move', {
+    socket.to(socket.currentDocument).emit('cursor:move', {
       userId: socket.user.userId,
       firstName: socket.user.firstName,
       lastName: socket.user.lastName,
@@ -347,7 +307,7 @@ io.on('connection', (socket) => {
       timestamp: Date.now()
     };
 
-    io.to(socket.currentCanvas).emit('chat:message', chatMessage);
+    io.to(socket.currentDocument).emit('chat:message', chatMessage);
   });
 
   // Disconnection

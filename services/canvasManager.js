@@ -1,9 +1,15 @@
 // Canvas Manager - Database-backed with Prisma
 // Hybrid approach: Active users in-memory, persistent data in database
-const prisma = require('./prisma');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+});
 
 class CanvasManager {
   constructor() {
+    // Store prisma client in instance
+    this.prisma = prisma;
+
     // In-memory cache for active users (ephemeral)
     this.activeUsers = new Map(); // Map<canvasId, Map<userId, userInfo>>
     // In-memory buffer for draw events (for performance)
@@ -13,8 +19,8 @@ class CanvasManager {
   // Get or create canvas state
   async getCanvasState(canvasId) {
     // Ensure canvas exists in database
-    let canvas = await prisma.canvas.findUnique({
-      where: { name: canvasId },
+    let canvas = await this.prisma.document.findUnique({
+      where: { id: canvasId },
       include: {
         shapes: {
           orderBy: { createdAt: 'asc' },
@@ -27,13 +33,15 @@ class CanvasManager {
     });
 
     if (!canvas) {
-      canvas = await prisma.canvas.create({
-        data: { name: canvasId },
-        include: {
-          shapes: true,
-          drawEvents: true,
-        },
-      });
+      // Document not found - return empty state
+      // Documents should be created through the document API
+      return {
+        id: canvasId,
+        shapes: [],
+        drawEvents: [],
+        users: [],
+        lastModified: new Date().toISOString(),
+      };
     }
 
     // Initialize active users cache if needed
@@ -78,9 +86,9 @@ class CanvasManager {
     const buffer = this.drawEventBuffers.get(canvasId);
     if (!buffer || buffer.length === 0) return;
 
-    await prisma.drawEvent.createMany({
+    await this.prisma.drawEvent.createMany({
       data: buffer.map(event => ({
-        canvasId: dbCanvasId,
+        documentId: dbCanvasId,
         userId: event.userId,
         data: JSON.stringify(event),
       })),
@@ -90,15 +98,15 @@ class CanvasManager {
     this.drawEventBuffers.set(canvasId, []);
 
     // Clean up old draw events (keep only last 1000)
-    const oldEvents = await prisma.drawEvent.findMany({
-      where: { canvasId: dbCanvasId },
+    const oldEvents = await this.prisma.drawEvent.findMany({
+      where: { documentId: dbCanvasId },
       orderBy: { timestamp: 'desc' },
       skip: 1000,
       select: { id: true },
     });
 
     if (oldEvents.length > 0) {
-      await prisma.drawEvent.deleteMany({
+      await this.prisma.drawEvent.deleteMany({
         where: {
           id: { in: oldEvents.map(e => e.id) },
         },
@@ -110,9 +118,9 @@ class CanvasManager {
   async addShape(canvasId, shapeData) {
     const canvas = await this._ensureCanvas(canvasId);
 
-    await prisma.shape.create({
+    await this.prisma.shape.create({
       data: {
-        canvasId: canvas.id,
+        documentId: canvas.id,
         userId: shapeData.userId,
         type: shapeData.type || 'unknown',
         data: JSON.stringify(shapeData),
@@ -122,7 +130,7 @@ class CanvasManager {
 
   // Update a shape
   async updateShape(canvasId, shapeId, updates) {
-    const existingShape = await prisma.shape.findUnique({
+    const existingShape = await this.prisma.shape.findUnique({
       where: { id: shapeId },
     });
 
@@ -130,7 +138,7 @@ class CanvasManager {
       const currentData = JSON.parse(existingShape.data);
       const updatedData = { ...currentData, ...updates, id: shapeId };
 
-      await prisma.shape.update({
+      await this.prisma.shape.update({
         where: { id: shapeId },
         data: {
           data: JSON.stringify(updatedData),
@@ -141,7 +149,7 @@ class CanvasManager {
 
   // Delete a shape
   async deleteShape(canvasId, shapeId) {
-    await prisma.shape.delete({
+    await this.prisma.shape.delete({
       where: { id: shapeId },
     }).catch(() => {
       // Shape might not exist, ignore error
@@ -152,12 +160,12 @@ class CanvasManager {
   async clearCanvas(canvasId) {
     const canvas = await this._ensureCanvas(canvasId);
 
-    await prisma.shape.deleteMany({
-      where: { canvasId: canvas.id },
+    await this.prisma.shape.deleteMany({
+      where: { documentId: canvas.id },
     });
 
-    await prisma.drawEvent.deleteMany({
-      where: { canvasId: canvas.id },
+    await this.prisma.drawEvent.deleteMany({
+      where: { documentId: canvas.id },
     });
 
     // Clear buffers
@@ -194,7 +202,7 @@ class CanvasManager {
 
   // Get all canvases (for admin purposes)
   async getAllCanvases() {
-    const canvases = await prisma.canvas.findMany({
+    const canvases = await this.prisma.document.findMany({
       include: {
         _count: {
           select: { shapes: true },
@@ -206,7 +214,7 @@ class CanvasManager {
       id: canvas.id,
       name: canvas.name,
       shapeCount: canvas._count.shapes,
-      userCount: this.activeUsers.get(canvas.name)?.size || 0,
+      userCount: this.activeUsers.get(canvas.id)?.size || 0,
       createdAt: canvas.createdAt.toISOString(),
       lastModified: canvas.lastModified.toISOString(),
     }));
@@ -216,16 +224,16 @@ class CanvasManager {
   async cleanupOldCanvases(maxAgeHours = 24) {
     const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
 
-    const oldCanvases = await prisma.canvas.findMany({
+    const oldCanvases = await this.prisma.document.findMany({
       where: {
         lastModified: { lt: cutoffTime },
       },
     });
 
     for (const canvas of oldCanvases) {
-      const hasActiveUsers = this.activeUsers.get(canvas.name)?.size > 0;
+      const hasActiveUsers = this.activeUsers.get(canvas.id)?.size > 0;
       if (!hasActiveUsers) {
-        await prisma.canvas.delete({
+        await this.prisma.document.delete({
           where: { id: canvas.id },
         });
         console.log(`Cleaned up canvas: ${canvas.name}`);
@@ -235,14 +243,13 @@ class CanvasManager {
 
   // Helper to ensure canvas exists
   async _ensureCanvas(canvasId) {
-    let canvas = await prisma.canvas.findUnique({
-      where: { name: canvasId },
+    let canvas = await this.prisma.document.findUnique({
+      where: { id: canvasId },
     });
 
     if (!canvas) {
-      canvas = await prisma.canvas.create({
-        data: { name: canvasId },
-      });
+      // Document not found - documents should be created through the API
+      throw new Error(`Document ${canvasId} not found. Please create the document first.`);
     }
 
     return canvas;

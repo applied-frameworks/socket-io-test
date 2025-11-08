@@ -84,6 +84,11 @@ export class WebGLDrawingApp {
 
     if (this.gl) {
       this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+      // Reset clear color and clear canvas after resize
+      // (resizing the canvas clears it to transparent)
+      this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // Pure black background
+      this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     }
   }
 
@@ -143,7 +148,7 @@ export class WebGLDrawingApp {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     // Clear canvas
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Pure black background
     gl.clear(gl.COLOR_BUFFER_BIT);
   }
 
@@ -192,6 +197,11 @@ export class WebGLDrawingApp {
     const windowResize = () => {
       this.resizeCanvas();
       this.redrawAllStrokes();
+
+      // Update selection box if a shape is selected
+      if (this.selectedShape) {
+        this.drawSelectionBox(this.selectedShape);
+      }
     };
     window.addEventListener('resize', windowResize);
     this.boundHandlers.set('window-resize', windowResize);
@@ -880,22 +890,33 @@ export class WebGLDrawingApp {
 
     const bounds = this.getShapeBounds(shape);
 
+    // Get canvas display scale factor
+    const canvasRect = this.canvas.getBoundingClientRect();
+    const scaleX = canvasRect.width / this.canvas.width;
+    const scaleY = canvasRect.height / this.canvas.height;
+
+    // Convert canvas coordinates to screen coordinates
+    const screenMinX = bounds.minX * scaleX;
+    const screenMinY = bounds.minY * scaleY;
+    const screenMaxX = bounds.maxX * scaleX;
+    const screenMaxY = bounds.maxY * scaleY;
+
     // Create selection box
     const selectionBox = document.createElement('div');
     selectionBox.className = 'selection-box';
     selectionBox.id = 'selection-box';
-    selectionBox.style.left = bounds.minX + 'px';
-    selectionBox.style.top = bounds.minY + 'px';
-    selectionBox.style.width = (bounds.maxX - bounds.minX) + 'px';
-    selectionBox.style.height = (bounds.maxY - bounds.minY) + 'px';
+    selectionBox.style.left = screenMinX + 'px';
+    selectionBox.style.top = screenMinY + 'px';
+    selectionBox.style.width = (screenMaxX - screenMinX) + 'px';
+    selectionBox.style.height = (screenMaxY - screenMinY) + 'px';
     this.container.appendChild(selectionBox);
 
     // Create resize handles at four corners
     const handles = [
-      { pos: 'nw', x: bounds.minX, y: bounds.minY, cursor: 'nw-resize' },
-      { pos: 'ne', x: bounds.maxX, y: bounds.minY, cursor: 'ne-resize' },
-      { pos: 'sw', x: bounds.minX, y: bounds.maxY, cursor: 'sw-resize' },
-      { pos: 'se', x: bounds.maxX, y: bounds.maxY, cursor: 'se-resize' }
+      { pos: 'nw', x: screenMinX, y: screenMinY, cursor: 'nw-resize' },
+      { pos: 'ne', x: screenMaxX, y: screenMinY, cursor: 'ne-resize' },
+      { pos: 'sw', x: screenMinX, y: screenMaxY, cursor: 'sw-resize' },
+      { pos: 'se', x: screenMaxX, y: screenMaxY, cursor: 'se-resize' }
     ];
 
     handles.forEach(handle => {
@@ -1030,7 +1051,7 @@ export class WebGLDrawingApp {
 
   clearCanvas() {
     const gl = this.gl;
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Pure black background
     gl.clear(gl.COLOR_BUFFER_BIT);
     this.strokes = [];
     this.clearSelection();
@@ -1038,7 +1059,7 @@ export class WebGLDrawingApp {
 
   redrawAllStrokes() {
     const gl = this.gl;
-    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0); // Pure black background
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     // Redraw all saved strokes
