@@ -678,6 +678,76 @@ test.describe('Drawing Functionality', () => {
 
       await cleanupDocument(doc);
     });
+
+    test('should align transform box correctly with selected shape', async ({ page }) => {
+      const doc = await setupTestDocument(page);
+
+      console.log('🎨 Testing transform box alignment...');
+
+      // Test with different shape types at various positions
+      const shapesToTest = [
+        { tool: '#rectangle-btn', type: 'rectangle', name: 'Rectangle' },
+        { tool: '#triangle-btn', type: 'triangle', name: 'Triangle' },
+        { tool: '#ellipse-btn', type: 'ellipse', name: 'Ellipse' }
+      ];
+
+      const canvas = page.locator('#canvas');
+      const canvasBounds = await canvas.boundingBox();
+
+      for (const shape of shapesToTest) {
+        console.log(`  Testing ${shape.name}...`);
+
+        // Draw the shape
+        await page.click(shape.tool);
+        await page.waitForTimeout(100);
+
+        const startX = canvasBounds.x + 300;
+        const startY = canvasBounds.y + 200;
+        const endX = canvasBounds.x + 500;
+        const endY = canvasBounds.y + 400;
+
+        await page.mouse.move(startX, startY);
+        await page.waitForTimeout(50);
+        await page.mouse.down();
+        await page.waitForTimeout(50);
+        await page.mouse.move(endX, endY, { steps: 10 });
+        await page.waitForTimeout(50);
+        await page.mouse.up();
+        await page.waitForTimeout(500);
+
+        // Switch to select tool
+        await page.click('#select-btn');
+        await page.waitForTimeout(100);
+
+        // Click on the shape to select it
+        const centerX = (startX + endX) / 2;
+        const centerY = (startY + endY) / 2;
+        await page.mouse.click(centerX, centerY);
+        await page.waitForTimeout(500);
+
+        // Get the selection box element
+        const selectionBox = page.locator('#selection-box');
+        await expect(selectionBox).toBeVisible();
+
+        // Get the bounding box of the selection UI
+        const selectionBounds = await selectionBox.boundingBox();
+
+        // The selection box should be aligned with the drawn shape
+        // Allow for 5px tolerance due to border width and rounding
+        const tolerance = 5;
+
+        expect(Math.abs(selectionBounds.x - startX)).toBeLessThan(tolerance);
+        expect(Math.abs(selectionBounds.y - startY)).toBeLessThan(tolerance);
+        expect(Math.abs((selectionBounds.x + selectionBounds.width) - endX)).toBeLessThan(tolerance);
+        expect(Math.abs((selectionBounds.y + selectionBounds.height) - endY)).toBeLessThan(tolerance);
+
+        console.log(`  ✅ ${shape.name} transform box aligned correctly`);
+      }
+
+      console.log('✅ All transform boxes aligned correctly');
+
+      await cleanupDocument(doc);
+    });
   });
 
   test.describe('Clear Canvas', () => {

@@ -1010,14 +1010,20 @@ export class WebGLDrawingApp {
 
     // Get canvas display scale factor
     const canvasRect = this.canvas.getBoundingClientRect();
+    const containerRect = this.container.getBoundingClientRect();
     const scaleX = canvasRect.width / this.canvas.width;
     const scaleY = canvasRect.height / this.canvas.height;
 
+    // Calculate canvas offset within container
+    const canvasOffsetX = canvasRect.left - containerRect.left;
+    const canvasOffsetY = canvasRect.top - containerRect.top;
+
     // Convert canvas coordinates to screen coordinates
-    const screenMinX = bounds.minX * scaleX;
-    const screenMinY = bounds.minY * scaleY;
-    const screenMaxX = bounds.maxX * scaleX;
-    const screenMaxY = bounds.maxY * scaleY;
+    // and add the canvas offset within the container
+    const screenMinX = bounds.minX * scaleX + canvasOffsetX;
+    const screenMinY = bounds.minY * scaleY + canvasOffsetY;
+    const screenMaxX = bounds.maxX * scaleX + canvasOffsetX;
+    const screenMaxY = bounds.maxY * scaleY + canvasOffsetY;
 
     // Create selection box
     const selectionBox = document.createElement('div');
