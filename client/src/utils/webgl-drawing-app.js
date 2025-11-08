@@ -210,6 +210,27 @@ export class WebGLDrawingApp {
     const containerMouseDown = (e) => this.handleContainerMouseDown(e);
     this.container.addEventListener('mousedown', containerMouseDown, true);
     this.boundHandlers.set('container-mousedown', containerMouseDown);
+
+    // Keyboard event listeners for shortcuts
+    const keydownHandler = (e) => {
+      // Delete/Backspace to delete selected shape
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.selectedShape) {
+          e.preventDefault();
+          this.deleteSelectedShape();
+        }
+      }
+      // Escape to deselect
+      else if (e.key === 'Escape') {
+        if (this.selectedShape) {
+          e.preventDefault();
+          this.clearSelection();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', keydownHandler);
+    this.boundHandlers.set('keydown', keydownHandler);
   }
 
   handleMouseDown(e) {
@@ -444,9 +465,29 @@ export class WebGLDrawingApp {
       return;
     }
 
-    // Handle brush/eraser (not implemented for socket emission yet)
-    if (this.currentStroke) {
-      this.strokes.push(this.currentStroke);
+    // Handle brush/eraser - convert to shape and emit
+    if (this.currentStroke && this.currentStroke.points.length > 0) {
+      // Convert stroke to shape format for persistence
+      const brushShape = {
+        id: this.generateShapeId(),
+        userId: this.userId,
+        tool: this.currentStroke.tool,
+        color: { ...this.currentStroke.color },
+        fillColor: { r: 0, g: 0, b: 0, a: 0 },
+        size: this.currentStroke.size,
+        x1: this.currentStroke.points[0].x,
+        y1: this.currentStroke.points[0].y,
+        x2: this.currentStroke.points[this.currentStroke.points.length - 1].x,
+        y2: this.currentStroke.points[this.currentStroke.points.length - 1].y,
+        customLabel: null,
+        points: this.currentStroke.points // Store all points for accurate replay
+      };
+
+      this.strokes.push(brushShape);
+
+      // Emit to server for persistence and realtime sync
+      this.emitShapeAdd(brushShape);
+
       this.currentStroke = null;
     }
     this.isDrawing = false;
@@ -1055,6 +1096,11 @@ export class WebGLDrawingApp {
     gl.clear(gl.COLOR_BUFFER_BIT);
     this.strokes = [];
     this.clearSelection();
+
+    // Emit to server to clear shapes from database
+    if (this.socket) {
+      this.socket.emit('document:clear');
+    }
   }
 
   redrawAllStrokes() {
@@ -1117,7 +1163,7 @@ export class WebGLDrawingApp {
     if (!this.socket) return;
 
     this.socket.emit('shape:delete', {
-      shapeId: shape.id
+      id: shape.id  // Server expects 'id', not 'shapeId'
     });
   }
 
@@ -1136,7 +1182,8 @@ export class WebGLDrawingApp {
       strokeColor: JSON.stringify(shape.color),
       fillColor: JSON.stringify(shape.fillColor),
       strokeSize: shape.size,
-      customLabel: shape.customLabel
+      customLabel: shape.customLabel,
+      points: shape.points ? JSON.stringify(shape.points) : null // For brush/eraser strokes
     };
   }
 
@@ -1144,7 +1191,7 @@ export class WebGLDrawingApp {
    * Convert backend shape format to internal format
    */
   convertShapeFromBackendFormat(backendShape) {
-    return {
+    const shape = {
       id: backendShape.id,
       userId: backendShape.userId,
       tool: backendShape.type,
@@ -1161,6 +1208,13 @@ export class WebGLDrawingApp {
       y2: backendShape.y2,
       customLabel: backendShape.customLabel
     };
+
+    // Add points array for brush/eraser strokes
+    if (backendShape.points && typeof backendShape.points === 'string') {
+      shape.points = JSON.parse(backendShape.points);
+    }
+
+    return shape;
   }
 
   /**
@@ -1340,6 +1394,8 @@ export class WebGLDrawingApp {
       } else if (event.startsWith('container-')) {
         const actualEvent = event.replace('container-', '');
         this.container.removeEventListener(actualEvent, handler);
+      } else if (event === 'keydown') {
+        document.removeEventListener('keydown', handler);
       } else {
         this.canvas.removeEventListener(event, handler);
       }

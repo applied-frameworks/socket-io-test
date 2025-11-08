@@ -173,6 +173,28 @@ const DocumentCanvas = ({ documentId, userId }) => {
         }
       })
     }
+
+    // Tab switching (Outline/History)
+    const outlineTab = document.getElementById('outline-tab')
+    const historyTab = document.getElementById('history-tab')
+    const outlineContent = document.getElementById('outline-content')
+    const historyContent = document.getElementById('history-content')
+
+    if (outlineTab && historyTab && outlineContent && historyContent) {
+      outlineTab.addEventListener('click', () => {
+        outlineTab.classList.add('active')
+        historyTab.classList.remove('active')
+        outlineContent.classList.add('active')
+        historyContent.classList.remove('active')
+      })
+
+      historyTab.addEventListener('click', () => {
+        historyTab.classList.add('active')
+        outlineTab.classList.remove('active')
+        historyContent.classList.add('active')
+        outlineContent.classList.remove('active')
+      })
+    }
   }
 
   return (
