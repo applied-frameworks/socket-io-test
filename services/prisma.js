@@ -1,3 +1,6 @@
+// Load environment variables before initializing Prisma
+// Use override: true to ensure .env values take precedence
+require('dotenv').config({ override: true });
 const { PrismaClient } = require('@prisma/client');
 
 // Singleton Prisma client instance

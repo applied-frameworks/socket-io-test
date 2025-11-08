@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { test, expect } = require('@playwright/test');
 const { PrismaClient } = require('@prisma/client');
 
