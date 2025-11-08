@@ -17,7 +17,7 @@ echo "DATABASE_URL is set: ${DATABASE_URL:+yes}"
 # Generate Prisma Client
 npx prisma generate
 
-# Push database schema (for SQLite or PostgreSQL)
-npx prisma db push --skip-generate
+# Apply pending migrations (production-safe)
+npx prisma migrate deploy
 
 echo "Database migrations completed successfully"

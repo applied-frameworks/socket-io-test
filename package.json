@@ -16,11 +16,14 @@
     "test:api": "playwright test tests/auth.spec.js",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
-    "db:push": "prisma db push",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "db:reset": "rm -f prisma/dev.db prisma/dev.db-journal && prisma db push",
-    "db:seed": "node prisma/seed.js"
+    "db:reset": "prisma migrate reset",
+    "db:seed": "node prisma/seed.js",
+    "db:push": "prisma db push"
   },
   "keywords": [
     "socket.io",

@@ -8,7 +8,13 @@ This is a Socket.IO-based realtime collaborative canvas backend with JWT authent
 
 **Tech Stack**: Node.js, Express, Socket.IO, JWT, bcrypt, Prisma ORM
 
-**Storage**: SQLite (local development), PostgreSQL (production ready)
+**Storage**: PostgreSQL (primary), supports 4 environments with zero code changes
+
+**Environments**:
+1. Local Dev (PostgreSQL via Docker - recommended for production parity)
+2. Hosted Dev (PostgreSQL on AWS RDS)
+3. Hosted Staging (PostgreSQL on AWS RDS)
+4. Hosted Production (PostgreSQL on AWS RDS)
 
 ## Development Commands
 
@@ -20,19 +26,28 @@ nvm use 22           # Switch to Node 22
 
 ### Running the Application
 ```bash
-npm install          # Install dependencies
-npm run db:push      # Sync database schema (first time setup)
-npm start            # Start production server + client
-npm run dev          # Start with nodemon (auto-reload) + client
+npm install                # Install dependencies
+docker compose up -d       # Start PostgreSQL (first time setup)
+npm run db:migrate:dev     # Apply database migrations
+npm start                  # Start production server + client
+npm run dev                # Start with nodemon (auto-reload) + client
 ```
 
 ### Database Commands
 ```bash
-npm run db:push      # Push schema changes to database
-npm run db:studio    # Open Prisma Studio (database GUI)
-npm run db:generate  # Regenerate Prisma Client
-npm run db:reset     # Reset database (deletes all data)
-npm run db:seed      # Seed database with test users
+# Migration Commands (Production-Safe)
+npm run db:migrate:dev     # Create & apply new migration (development)
+npm run db:migrate:deploy  # Apply pending migrations (production)
+npm run db:migrate:status  # Check migration status
+
+# Utility Commands
+npm run db:studio          # Open Prisma Studio (database GUI)
+npm run db:generate        # Regenerate Prisma Client
+npm run db:reset           # Reset database with migrations
+npm run db:seed            # Seed database with test users
+
+# Prototyping Only (DO NOT use in production)
+npm run db:push            # Push schema without migrations
 ```
 
 ### Database Seeding
@@ -75,29 +90,38 @@ npm run test:report  # Open HTML test report
 - **UI Tests** (`tests/ui-auth-flow.spec.js`): Full signup/login flow - **requires servers running**
 
 **Running Tests Workflow:**
-1. Ensure database is set up: `npm run db:push`
+1. Ensure database is set up: `npm run db:migrate:dev`
 2. Start dev servers: `npm run dev` (in separate terminal)
 3. Wait for servers to be ready (backend on port 3000, frontend on port 8000)
 4. Run tests: `npm test`
 
 ### Environment Setup
-Create `.env` from `.env.example`:
+
+**Local Development with Docker (Recommended)**:
+```bash
+# 1. Copy .env.example to .env
+cp .env.example .env
+
+# 2. Edit .env and uncomment the PostgreSQL Docker option:
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/canvas_dev?schema=public"
+
+# 3. Generate a secure JWT secret
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+# 4. Start PostgreSQL
+docker compose up -d
+
+# 5. Apply migrations
+npm run db:migrate:dev
+```
+
+**Environment Variables** (`.env`):
 ```bash
 PORT=3000
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+JWT_SECRET=<generated-secret-from-step-3>
 NODE_ENV=development
 CLIENT_URL=http://localhost:8000
-DATABASE_URL="file:./dev.db"  # SQLite for local dev
-```
-
-Generate a secure JWT secret:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-**For Production (PostgreSQL)**:
-```bash
-DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/canvas_dev?schema=public"
 ```
 
 ### Health Check
@@ -215,37 +239,105 @@ This application can be deployed to multiple platforms. See detailed deployment 
 
 **Port**: Reads from `process.env.PORT` (dynamically assigned by platform)
 
-## PostgreSQL Migration (Production)
+## 4-Environment Database Strategy
 
-Migrating from SQLite to PostgreSQL is simple with Prisma:
+This project uses PostgreSQL as the primary database with Prisma migrations for all environments. **Zero code changes** are needed when promoting through environments.
 
-1. **Update DATABASE_URL** in `.env` or production environment:
-   ```bash
-   DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
-   ```
+### Environment Workflow
 
-2. **Push schema to PostgreSQL**:
-   ```bash
-   npm run db:push
-   ```
-
-3. **No code changes needed** - Prisma handles the database differences
-
-**Optional**: Update `prisma/schema.prisma` datasource for PostgreSQL-specific features:
-```prisma
-datasource db {
-  provider = "postgresql"  // Change from "sqlite"
-  url      = env("DATABASE_URL")
-}
 ```
+Local Dev → Git → Hosted Dev → Hosted Staging → Hosted Production
+```
+
+**Key Principle**: The same `schema.prisma` and `prisma/migrations/` folder work across all environments. Only `DATABASE_URL` changes per environment.
+
+### Environment Configurations
+
+#### 1. Local Development (PostgreSQL via Docker)
+```bash
+# .env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/canvas_dev?schema=public"
+
+# Commands
+docker compose up -d              # Start PostgreSQL
+npm run db:migrate:dev            # Create/apply migrations
+npm run db:seed                   # Seed test data
+```
+
+#### 2. Hosted Dev (AWS RDS PostgreSQL)
+```bash
+# Environment variable in AWS Elastic Beanstalk
+DATABASE_URL="postgresql://user:pass@dev-db.aws.com:5432/canvas_dev?schema=public"
+
+# Deployment (automatic via GitHub Actions)
+git push origin dev
+# → Runs: npx prisma migrate deploy
+```
+
+#### 3. Hosted Staging (AWS RDS PostgreSQL)
+```bash
+# Environment variable in AWS Elastic Beanstalk
+DATABASE_URL="postgresql://user:pass@staging-db.aws.com:5432/canvas_staging?schema=public"
+
+# Deployment
+git push origin staging
+# → Runs: npx prisma migrate deploy
+```
+
+#### 4. Hosted Production (AWS RDS PostgreSQL)
+```bash
+# Environment variable in AWS Elastic Beanstalk
+DATABASE_URL="postgresql://user:pass@prod-db.aws.com:5432/canvas_prod?schema=public"
+
+# Deployment
+git push origin main
+# → Runs: npx prisma migrate deploy
+```
+
+### Migration Workflow
+
+**Development (Creating Migrations)**:
+```bash
+# 1. Modify schema in prisma/schema.prisma
+# 2. Create migration
+npm run db:migrate:dev
+# This creates a new migration file in prisma/migrations/
+
+# 3. Commit and push
+git add prisma/
+git commit -m "Add new feature schema"
+git push
+```
+
+**Production (Applying Migrations)**:
+- Migrations are **automatically applied** during deployment
+- The predeploy hook (`.platform/hooks/predeploy/01_database.sh`) runs `prisma migrate deploy`
+- This applies all pending migrations safely without data loss
+
+### Important Notes
+
+- **Never edit migration files manually** - always generate via `prisma migrate dev`
+- **Never use `db:push` in production** - it bypasses migration history
+- **Always test migrations in dev/staging** before production
+- **Migration files are committed to git** - they are the source of truth
+- **Rollbacks**: Use `prisma migrate resolve` if needed (see Prisma docs)
+
+### Schema Changes Best Practices
+
+1. **Add new fields as optional** first, then make required in a second migration
+2. **Never rename fields directly** - add new field, migrate data, drop old field
+3. **Test with production-like data** in staging
+4. **Coordinate with team** before making breaking changes
 
 ## Important Notes
 
-- **Database**: SQLite for local dev (`prisma/dev.db`), PostgreSQL for production
-- **Prisma Client**: Auto-generated after schema changes - run `npm run db:generate` if needed
+- **Database**: PostgreSQL for all environments (local via Docker, hosted via AWS RDS)
+- **Migrations**: Use `db:migrate:dev` in development, `db:migrate:deploy` runs automatically in production
+- **Code Promotion**: Zero file changes needed - same codebase works across all 4 environments
+- **Prisma Client**: Auto-generated after migrations - regenerate with `npm run db:generate` if needed
 - **Testing**: UI tests require both backend (port 3000) and frontend (port 8000) servers running via `npm run dev`
-- JWT_SECRET and DATABASE_URL must be set in production
-- Draw events persisted but limited to last 1000 per canvas
-- Active users are in-memory only (not persisted to database)
-- Socket.IO ping settings: 25s interval, 60s timeout (adjust for network conditions)
-- Cleanup interval runs hourly - consider external cron in production
+- **Environment Variables**: JWT_SECRET and DATABASE_URL must be configured in all environments
+- **Draw Events**: Persisted but limited to last 1000 per canvas
+- **Active Users**: In-memory only (not persisted to database, cleared on restart)
+- **Socket.IO Settings**: 25s ping interval, 60s timeout (adjust for network conditions)
+- **Cleanup**: Canvases with no users for 24h deleted hourly - consider external cron in production
