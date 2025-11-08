@@ -17,8 +17,14 @@ export class WebGLDrawingApp {
       throw new Error('Canvas, preview canvas, and container are required');
     }
 
-    // Initialize WebGL context
-    this.gl = this.canvas.glContext = this.canvas.getContext('webgl2') || this.canvas.getContext('webgl');
+    // Initialize WebGL context with alpha disabled for opaque background
+    const glOptions = {
+      alpha: false,
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: true
+    };
+    this.gl = this.canvas.glContext = this.canvas.getContext('webgl2', glOptions) ||
+                                      this.canvas.getContext('webgl', glOptions);
     this.previewCtx = this.previewCanvas.getContext('2d');
 
     if (!this.gl) {
@@ -89,6 +95,11 @@ export class WebGLDrawingApp {
       // (resizing the canvas clears it to transparent)
       this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // Pure black background
       this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    }
+
+    // Ensure preview canvas is transparent
+    if (this.previewCtx) {
+      this.previewCtx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
     }
   }
 
