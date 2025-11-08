@@ -40,6 +40,11 @@ export class WebGLDrawingApp {
     this.lastX = 0;
     this.lastY = 0;
 
+    // Expose current tool on window for testing/debugging
+    if (typeof window !== 'undefined') {
+      window.currentTool = this.currentTool;
+    }
+
     // Shape drawing state
     this.shapeStartX = 0;
     this.shapeStartY = 0;
@@ -374,6 +379,14 @@ export class WebGLDrawingApp {
       return;
     }
 
+    // Only allow drawing for known drawing tools
+    const drawingTools = ['brush', 'eraser', 'rectangle', 'triangle', 'ellipse'];
+    if (!drawingTools.includes(this.currentTool)) {
+      console.log(`[DEBUG] Blocked drawing for unknown tool: ${this.currentTool}`);
+      return; // Unknown tool, don't draw
+    }
+
+    console.log(`[DEBUG] Allowing drawing for tool: ${this.currentTool}`);
     this.isDrawing = true;
     this.lastX = pos.x;
     this.lastY = pos.y;
@@ -408,6 +421,11 @@ export class WebGLDrawingApp {
     // Handle shape tools with preview
     if (this.isShapeTool()) {
       this.drawShapePreview(this.shapeStartX, this.shapeStartY, pos.x, pos.y);
+      return;
+    }
+
+    // Only draw lines for brush/eraser tools
+    if (!this.currentStroke) {
       return;
     }
 
@@ -470,9 +488,12 @@ export class WebGLDrawingApp {
       const rect = this.canvas.getBoundingClientRect();
       const lastMouseEvent = this.lastMouseEvent || { clientX: rect.left, clientY: rect.top };
       const pos = this.getMousePos(lastMouseEvent);
+
+      // Set isDrawing to false BEFORE finalizing to prevent preview drawing
+      this.isDrawing = false;
+
       this.finalizeShape(this.shapeStartX, this.shapeStartY, pos.x, pos.y);
       this.clearPreview();
-      this.isDrawing = false;
       return;
     }
 
@@ -616,21 +637,31 @@ export class WebGLDrawingApp {
   }
 
   drawShapePreview(x1, y1, x2, y2) {
+    // Clear the preview canvas completely
     this.clearPreview();
 
     const ctx = this.previewCtx;
 
-    // Convert WebGL color to CSS
+    // Completely reset canvas rendering context state
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Start a fresh path (no leftover paths)
+    ctx.beginPath();
+
+    // Set drawing style for shape preview
     const r = Math.round(this.currentColor.r * 255);
     const g = Math.round(this.currentColor.g * 255);
     const b = Math.round(this.currentColor.b * 255);
     ctx.strokeStyle = `rgb(${r}, ${g}, ${b})`;
+    ctx.fillStyle = 'transparent';
     ctx.lineWidth = this.brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    ctx.beginPath();
-
+    // Draw the shape path based on tool
     switch (this.currentTool) {
       case 'rectangle':
         const width = x2 - x1;
@@ -655,11 +686,25 @@ export class WebGLDrawingApp {
         break;
     }
 
+    // Draw the stroke
     ctx.stroke();
+
+    // Restore canvas state
+    ctx.restore();
   }
 
   clearPreview() {
-    this.previewCtx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+    const ctx = this.previewCtx;
+    // Save the current transform
+    ctx.save();
+    // Reset transform to identity
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Clear the entire canvas
+    ctx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+    // Restore the transform
+    ctx.restore();
+    // Reset all canvas state
+    ctx.beginPath();
   }
 
   finalizeShape(x1, y1, x2, y2) {
@@ -674,8 +719,11 @@ export class WebGLDrawingApp {
       customLabel: null
     };
 
+    // Add to strokes array
     this.strokes.push(shape);
-    this.redrawAllStrokes();
+
+    // Draw this specific shape on the WebGL canvas
+    this.drawShapeWebGL(shape);
 
     // Update outline panel
     this.updateOutlinePanel();
@@ -1302,7 +1350,19 @@ export class WebGLDrawingApp {
    * Set the current drawing tool
    */
   setTool(tool) {
+    console.log(`[DEBUG setTool] Changing tool from '${this.currentTool}' to '${tool}'`);
+
+    // Clear any ongoing drawing state when switching tools
+    this.isDrawing = false;
+    this.currentStroke = null;
+    this.clearPreview();
+
     this.currentTool = tool;
+
+    // Expose current tool on window for testing/debugging
+    if (typeof window !== 'undefined') {
+      window.currentTool = tool;
+    }
 
     // Clear selection when switching away from select tool
     if (tool !== 'select' && this.selectedShape) {
@@ -1315,6 +1375,8 @@ export class WebGLDrawingApp {
     } else {
       this.canvas.style.cursor = 'crosshair';
     }
+
+    console.log(`[DEBUG setTool] Tool is now: '${this.currentTool}'`);
   }
 
   /**

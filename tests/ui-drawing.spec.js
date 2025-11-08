@@ -374,6 +374,109 @@ test.describe('Drawing Functionality', () => {
   });
 
   test.describe('Tool Switching', () => {
+    test('should NOT draw with select/pointer tool', async ({ page }) => {
+      const doc = await setupTestDocument(page);
+
+      console.log('🎨 Testing that select tool does not draw lines...');
+
+      // Check if there are any shapes created during page load
+      const shapesBeforeTest = await prisma.shape.findMany({
+        where: { documentId: doc.id }
+      });
+      console.log(`📊 Shapes before test starts: ${shapesBeforeTest.length}`);
+      if (shapesBeforeTest.length > 0) {
+        console.log(`⚠️  Shapes exist before test:`, shapesBeforeTest.map(s => ({ type: s.type, id: s.id })));
+        // Clean them up
+        await prisma.shape.deleteMany({ where: { documentId: doc.id } });
+        console.log(`🧹 Cleaned up ${shapesBeforeTest.length} shapes before test`);
+      }
+
+      // First, manually set the tool via JavaScript to ensure it's set
+      await page.evaluate(() => {
+        // Find the WebGLDrawingApp instance
+        const canvas = document.getElementById('canvas');
+        if (canvas && canvas.glContext) {
+          // The app stores gl context on the canvas
+          console.log('[TEST] Found canvas with WebGL context');
+        }
+
+        // Try to find appRef through React's fiber
+        const container = document.getElementById('container');
+        console.log('[TEST] Container found:', !!container);
+      });
+
+      // Switch to select tool via clicking
+      await page.click('#select-btn');
+      await expect(page.locator('#select-btn')).toHaveClass(/active/);
+
+      // Ensure brush is no longer active
+      await expect(page.locator('#brush-btn')).not.toHaveClass(/active/);
+
+      // Wait longer for tool to be fully set and WebGL state to update
+      await page.waitForTimeout(500);
+
+      // Verify the tool was actually set in JavaScript
+      const currentTool = await page.evaluate(() => {
+        const canvas = document.getElementById('canvas');
+        // Try to access the WebGLDrawingApp instance
+        // It might be stored on the canvas or in a React ref
+        return window.currentTool || 'unknown';
+      });
+      console.log(`[TEST] Current tool after click: ${currentTool}`);
+
+      // Get canvas element
+      const canvas = page.locator('#canvas');
+      const canvasBounds = await canvas.boundingBox();
+
+      // Try to draw by clicking and dragging
+      const startX = canvasBounds.x + 100;
+      const startY = canvasBounds.y + 100;
+      const endX = canvasBounds.x + 300;
+      const endY = canvasBounds.y + 200;
+
+      // Check tool before drag
+      const toolBeforeDrag = await page.evaluate(() => window.currentTool);
+      console.log(`[TEST] Tool before drag: ${toolBeforeDrag}`);
+
+      await page.mouse.move(startX, startY);
+      await page.waitForTimeout(50);
+      await page.mouse.down();
+      await page.waitForTimeout(50);
+
+      // Check tool during drag (after mouse down)
+      const toolDuringDrag = await page.evaluate(() => window.currentTool);
+      console.log(`[TEST] Tool during drag (after mousedown): ${toolDuringDrag}`);
+
+      // Drag across the canvas
+      await page.mouse.move(endX, endY, { steps: 20 });
+      await page.waitForTimeout(50);
+      await page.mouse.up();
+
+      // Check tool after drag
+      const toolAfterDrag = await page.evaluate(() => window.currentTool);
+      console.log(`[TEST] Tool after drag: ${toolAfterDrag}`);
+
+      // Wait to see if any shapes were accidentally created
+      await page.waitForTimeout(800);
+
+      // Verify NO shapes were created in database
+      const shapes = await prisma.shape.findMany({
+        where: { documentId: doc.id }
+      });
+
+      console.log(`📊 Shapes created with select tool: ${shapes.length} (expected 0)`);
+      if (shapes.length > 0) {
+        console.log(`❌ Unexpected shapes:`, shapes.map(s => ({ type: s.type, id: s.id })));
+      }
+
+      // Should have zero shapes - select tool should not draw
+      expect(shapes.length).toBe(0);
+
+      console.log('✅ Select tool correctly does not draw lines');
+
+      await cleanupDocument(doc);
+    });
+
     test('should switch between tools correctly', async ({ page }) => {
       const doc = await setupTestDocument(page);
 
