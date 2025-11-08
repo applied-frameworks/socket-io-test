@@ -1409,6 +1409,8 @@ export class WebGLDrawingApp {
       if (this.selectedShape) {
         this.drawSelectionBox(this.selectedShape);
       }
+      // Emit update to persist changes to database
+      this.emitShapeUpdate(this.selectedShape);
     }
   }
 
@@ -1431,6 +1433,8 @@ export class WebGLDrawingApp {
       if (this.selectedShape) {
         this.drawSelectionBox(this.selectedShape);
       }
+      // Emit update to persist changes to database
+      this.emitShapeUpdate(this.selectedShape);
     }
   }
 
@@ -1446,6 +1450,8 @@ export class WebGLDrawingApp {
       if (this.selectedShape) {
         this.drawSelectionBox(this.selectedShape);
       }
+      // Emit update to persist changes to database
+      this.emitShapeUpdate(this.selectedShape);
     }
   }
 
@@ -1461,6 +1467,8 @@ export class WebGLDrawingApp {
       if (this.selectedShape) {
         this.drawSelectionBox(this.selectedShape);
       }
+      // Emit update to persist changes to database
+      this.emitShapeUpdate(this.selectedShape);
     }
   }
 

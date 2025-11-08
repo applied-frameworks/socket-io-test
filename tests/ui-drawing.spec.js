@@ -748,6 +748,115 @@ test.describe('Drawing Functionality', () => {
 
       await cleanupDocument(doc);
     });
+
+    test('should apply fill and stroke changes to selected shape', async ({ page }) => {
+      const doc = await setupTestDocument(page);
+
+      console.log('🎨 Testing fill and stroke changes on selected shape...');
+
+      // Draw a rectangle with default colors (white stroke, transparent fill)
+      await page.click('#rectangle-btn');
+      await page.waitForTimeout(100);
+
+      const canvas = page.locator('#canvas');
+      const canvasBounds = await canvas.boundingBox();
+
+      const startX = canvasBounds.x + 100;
+      const startY = canvasBounds.y + 100;
+      const endX = canvasBounds.x + 200;
+      const endY = canvasBounds.y + 200;
+      const rectCenterX = (startX + endX) / 2;
+      const rectCenterY = (startY + endY) / 2;
+
+      await page.mouse.move(startX, startY);
+      await page.waitForTimeout(50);
+      await page.mouse.down();
+      await page.waitForTimeout(50);
+      await page.mouse.move(endX, endY, { steps: 10 });
+      await page.waitForTimeout(50);
+      await page.mouse.up();
+
+      // Wait for shape to be created and persisted
+      await page.waitForTimeout(800);
+
+      // Get initial shape data
+      let shapes = await prisma.shape.findMany({
+        where: {
+          documentId: doc.id,
+          type: 'rectangle'
+        }
+      });
+      expect(shapes.length).toBeGreaterThan(0);
+      const initialShape = shapes[0];
+      console.log('📊 Initial shape stroke color:', initialShape.strokeColor);
+      console.log('📊 Initial shape fill color:', initialShape.fillColor);
+
+      // Switch to select tool
+      await page.click('#select-btn');
+      await page.waitForTimeout(100);
+
+      // Click on the rectangle to select it
+      await page.mouse.click(rectCenterX, rectCenterY);
+      await page.waitForTimeout(500);
+
+      // Verify selection box is visible
+      const selectionBox = page.locator('#selection-box');
+      await expect(selectionBox).toBeVisible();
+
+      console.log('  Changing stroke color to red...');
+      // Change stroke color to red
+      await page.locator('#color-picker').fill('#ff0000');
+      await page.waitForTimeout(500);
+
+      console.log('  Changing fill color to blue...');
+      // Change fill color to blue
+      await page.locator('#fill-picker').fill('#0000ff');
+      await page.waitForTimeout(500);
+
+      console.log('  Changing fill opacity to 80%...');
+      // Change fill opacity to 80%
+      await page.locator('#fill-opacity-slider').fill('80');
+      await page.waitForTimeout(500);
+
+      console.log('  Changing stroke opacity to 60%...');
+      // Change stroke opacity to 60%
+      await page.locator('#stroke-opacity-slider').fill('60');
+      await page.waitForTimeout(800);
+
+      // Fetch the updated shape from database
+      shapes = await prisma.shape.findMany({
+        where: {
+          documentId: doc.id,
+          type: 'rectangle'
+        }
+      });
+
+      expect(shapes.length).toBeGreaterThan(0);
+      const updatedShape = shapes[0];
+
+      console.log('📊 Updated shape stroke color:', updatedShape.strokeColor);
+      console.log('📊 Updated shape fill color:', updatedShape.fillColor);
+
+      // Parse the color values (they're stored as JSON strings)
+      const strokeColor = JSON.parse(updatedShape.strokeColor);
+      const fillColor = JSON.parse(updatedShape.fillColor);
+
+      // Verify stroke color is red (r=1.0, g=0, b=0) with 60% opacity (a=0.6)
+      expect(strokeColor.r).toBeCloseTo(1.0, 1);
+      expect(strokeColor.g).toBeCloseTo(0, 1);
+      expect(strokeColor.b).toBeCloseTo(0, 1);
+      expect(strokeColor.a).toBeCloseTo(0.6, 1);
+
+      // Verify fill color is blue (r=0, g=0, b=1.0) with 80% opacity (a=0.8)
+      expect(fillColor.r).toBeCloseTo(0, 1);
+      expect(fillColor.g).toBeCloseTo(0, 1);
+      expect(fillColor.b).toBeCloseTo(1.0, 1);
+      expect(fillColor.a).toBeCloseTo(0.8, 1);
+
+      console.log('✅ Fill and stroke changes applied and persisted successfully');
+
+      await cleanupDocument(doc);
+    });
   });
 
   test.describe('Clear Canvas', () => {
