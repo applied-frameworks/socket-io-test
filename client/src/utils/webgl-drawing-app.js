@@ -382,11 +382,9 @@ export class WebGLDrawingApp {
     // Only allow drawing for known drawing tools
     const drawingTools = ['brush', 'eraser', 'rectangle', 'triangle', 'ellipse'];
     if (!drawingTools.includes(this.currentTool)) {
-      console.log(`[DEBUG] Blocked drawing for unknown tool: ${this.currentTool}`);
       return; // Unknown tool, don't draw
     }
 
-    console.log(`[DEBUG] Allowing drawing for tool: ${this.currentTool}`);
     this.isDrawing = true;
     this.lastX = pos.x;
     this.lastY = pos.y;
@@ -489,6 +487,9 @@ export class WebGLDrawingApp {
       const lastMouseEvent = this.lastMouseEvent || { clientX: rect.left, clientY: rect.top };
       const pos = this.getMousePos(lastMouseEvent);
 
+      // Clear currentStroke to prevent it from being processed as a brush stroke
+      this.currentStroke = null;
+
       // Set isDrawing to false BEFORE finalizing to prevent preview drawing
       this.isDrawing = false;
 
@@ -499,26 +500,34 @@ export class WebGLDrawingApp {
 
     // Handle brush/eraser - convert to shape and emit
     if (this.currentStroke && this.currentStroke.points.length > 0) {
-      // Convert stroke to shape format for persistence
-      const brushShape = {
-        id: this.generateShapeId(),
-        userId: this.userId,
-        tool: this.currentStroke.tool,
-        color: { ...this.currentStroke.color },
-        fillColor: { r: 0, g: 0, b: 0, a: 0 },
-        size: this.currentStroke.size,
-        x1: this.currentStroke.points[0].x,
-        y1: this.currentStroke.points[0].y,
-        x2: this.currentStroke.points[this.currentStroke.points.length - 1].x,
-        y2: this.currentStroke.points[this.currentStroke.points.length - 1].y,
-        customLabel: null,
-        points: this.currentStroke.points // Store all points for accurate replay
-      };
+      // ONLY process brush/eraser strokes - NOT shape tools
+      // Also verify the CURRENT tool matches to prevent stale strokes from being saved
+      const strokeTool = this.currentStroke.tool;
+      const currentToolIsBrush = this.currentTool === 'brush' || this.currentTool === 'eraser';
+      const strokeToolIsBrush = strokeTool === 'brush' || strokeTool === 'eraser';
 
-      this.strokes.push(brushShape);
+      if (strokeToolIsBrush && currentToolIsBrush) {
+        // Convert stroke to shape format for persistence
+        const brushShape = {
+          id: this.generateShapeId(),
+          userId: this.userId,
+          tool: this.currentStroke.tool,
+          color: { ...this.currentStroke.color },
+          fillColor: { r: 0, g: 0, b: 0, a: 0 },
+          size: this.currentStroke.size,
+          x1: this.currentStroke.points[0].x,
+          y1: this.currentStroke.points[0].y,
+          x2: this.currentStroke.points[this.currentStroke.points.length - 1].x,
+          y2: this.currentStroke.points[this.currentStroke.points.length - 1].y,
+          customLabel: null,
+          points: this.currentStroke.points // Store all points for accurate replay
+        };
 
-      // Emit to server for persistence and realtime sync
-      this.emitShapeAdd(brushShape);
+        this.strokes.push(brushShape);
+
+        // Emit to server for persistence and realtime sync
+        this.emitShapeAdd(brushShape);
+      }
 
       this.currentStroke = null;
     }
@@ -1350,8 +1359,6 @@ export class WebGLDrawingApp {
    * Set the current drawing tool
    */
   setTool(tool) {
-    console.log(`[DEBUG setTool] Changing tool from '${this.currentTool}' to '${tool}'`);
-
     // Clear any ongoing drawing state when switching tools
     this.isDrawing = false;
     this.currentStroke = null;
@@ -1375,8 +1382,6 @@ export class WebGLDrawingApp {
     } else {
       this.canvas.style.cursor = 'crosshair';
     }
-
-    console.log(`[DEBUG setTool] Tool is now: '${this.currentTool}'`);
   }
 
   /**

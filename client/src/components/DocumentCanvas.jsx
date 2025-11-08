@@ -14,6 +14,14 @@ const DocumentCanvas = ({ documentId, userId }) => {
   useEffect(() => {
     if (!documentId || !userId) return
 
+    // IMPORTANT: React StrictMode double-invoke protection
+    // In development, React.StrictMode intentionally double-invokes effects to detect side effects.
+    // Since our WebGLDrawingApp import is async, the cleanup can run before the import completes,
+    // causing TWO instances to be created (one from each invoke). Both instances would then handle
+    // the same mouse events, creating duplicate shapes in the database.
+    // This flag ensures that if cleanup runs before the import completes, we don't create the instance.
+    let isCancelled = false
+
     // Initialize Socket.IO connection
     const token = localStorage.getItem('token')
     const socket = io(API_URL, {
@@ -56,8 +64,21 @@ const DocumentCanvas = ({ documentId, userId }) => {
       }
     })
 
+    // Destroy any existing instance before creating a new one
+    if (appRef.current) {
+      console.log('[DocumentCanvas] Destroying existing WebGLDrawingApp instance before creating new one')
+      appRef.current.destroy()
+      appRef.current = null
+    }
+
     // Initialize WebGL Drawing App
     import('../utils/webgl-drawing-app').then(({ WebGLDrawingApp }) => {
+      // Don't create instance if effect has been cleaned up (React StrictMode double-invoke protection)
+      if (isCancelled) {
+        console.log('[DocumentCanvas] Skipping WebGLDrawingApp creation - effect was cleaned up')
+        return
+      }
+
       appRef.current = new WebGLDrawingApp({
         canvas: canvasRef.current,
         previewCanvas: previewCanvasRef.current,
@@ -72,9 +93,13 @@ const DocumentCanvas = ({ documentId, userId }) => {
     })
 
     return () => {
+      // Set cancellation flag to prevent async import from creating instance
+      isCancelled = true
+
       socket.disconnect()
       if (appRef.current) {
         appRef.current.destroy()
+        appRef.current = null
       }
     }
   }, [documentId, userId])
@@ -94,7 +119,11 @@ const DocumentCanvas = ({ documentId, userId }) => {
     Object.entries(toolButtons).forEach(([btnId, tool]) => {
       const btn = document.getElementById(btnId)
       if (btn) {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          // Prevent button clicks from triggering canvas drawing events
+          e.stopPropagation()
+          e.preventDefault()
+
           if (appRef.current) {
             appRef.current.setTool(tool)
 

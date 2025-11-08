@@ -156,6 +156,68 @@ test.describe('Drawing Functionality', () => {
       await cleanupDocument(doc);
     });
 
+    test('should draw ONLY a rectangle without extra white line', async ({ page }) => {
+      const doc = await setupTestDocument(page);
+
+      console.log('🎨 Testing that rectangle drawing creates only ONE shape...');
+
+      // Capture browser console logs
+      const consoleLogs = [];
+      page.on('console', msg => {
+        const text = msg.text();
+        if (text.includes('[DEBUG') || text.includes('shape') || text.includes('stroke')) {
+          consoleLogs.push(text);
+          console.log(`[BROWSER] ${text}`);
+        }
+      });
+
+      // Click rectangle tool
+      await page.click('#rectangle-btn');
+      await expect(page.locator('#rectangle-btn')).toHaveClass(/active/);
+
+      // Wait for tool to be fully set
+      await page.waitForTimeout(100);
+
+      // Get canvas element
+      const canvas = page.locator('#canvas');
+      const canvasBounds = await canvas.boundingBox();
+
+      // Draw a rectangle by clicking and dragging
+      const startX = canvasBounds.x + 100;
+      const startY = canvasBounds.y + 100;
+      const endX = canvasBounds.x + 300;
+      const endY = canvasBounds.y + 200;
+
+      await page.mouse.move(startX, startY);
+      await page.waitForTimeout(50);
+      await page.mouse.down();
+      await page.waitForTimeout(50);
+      await page.mouse.move(endX, endY, { steps: 10 });
+      await page.waitForTimeout(50);
+      await page.mouse.up();
+
+      // Wait for shape to be created and persisted
+      await page.waitForTimeout(800);
+
+      // Verify ONLY ONE shape was created (no extra white line)
+      const allShapes = await prisma.shape.findMany({
+        where: { documentId: doc.id }
+      });
+
+      console.log(`📊 Total shapes created: ${allShapes.length} (expected 1)`);
+      if (allShapes.length > 1) {
+        console.log(`❌ Extra shapes found:`, allShapes.map(s => ({ type: s.type, id: s.id })));
+      }
+
+      // Should have exactly 1 shape
+      expect(allShapes.length).toBe(1);
+      expect(allShapes[0].type).toBe('rectangle');
+
+      console.log('✅ Only one rectangle created (no extra white line)');
+
+      await cleanupDocument(doc);
+    });
+
     test('should draw a triangle', async ({ page }) => {
       const doc = await setupTestDocument(page);
 
