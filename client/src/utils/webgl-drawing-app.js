@@ -677,6 +677,9 @@ export class WebGLDrawingApp {
     this.strokes.push(shape);
     this.redrawAllStrokes();
 
+    // Update outline panel
+    this.updateOutlinePanel();
+
     // Emit shape via Socket.IO
     this.emitShapeAdd(shape);
   }
@@ -921,6 +924,9 @@ export class WebGLDrawingApp {
     this.selectedShape = shape;
     this.drawSelectionBox(shape);
 
+    // Update outline panel to show selection
+    this.updateOutlinePanel();
+
     // Update UI controls to match selected shape
     if (shape.color) {
       this.currentColor = { ...shape.color };
@@ -934,6 +940,9 @@ export class WebGLDrawingApp {
   clearSelection() {
     this.selectedShape = null;
     this.removeSelectionUI();
+
+    // Update outline panel to remove selection
+    this.updateOutlinePanel();
   }
 
   drawSelectionBox(shape) {
@@ -1099,6 +1108,9 @@ export class WebGLDrawingApp {
 
     // Redraw
     this.redrawAllStrokes();
+
+    // Update outline panel
+    this.updateOutlinePanel();
   }
 
   clearCanvas() {
@@ -1238,6 +1250,7 @@ export class WebGLDrawingApp {
       // Remove shape by ID
       this.strokes = this.strokes.filter(s => s.id !== shape.shapeId);
       this.redrawAllStrokes();
+      this.updateOutlinePanel();
       return;
     }
 
@@ -1247,12 +1260,14 @@ export class WebGLDrawingApp {
       // Add new shape
       this.strokes.push(convertedShape);
       this.drawShapeWebGL(convertedShape);
+      this.updateOutlinePanel();
     } else if (action === 'update') {
       // Update existing shape
       const index = this.strokes.findIndex(s => s.id === shape.shapeId || s.id === shape.id);
       if (index !== -1) {
         this.strokes[index] = convertedShape;
         this.redrawAllStrokes();
+        this.updateOutlinePanel();
       }
     }
   }
@@ -1271,6 +1286,9 @@ export class WebGLDrawingApp {
 
     // Redraw canvas
     this.redrawAllStrokes();
+
+    // Update outline panel
+    this.updateOutlinePanel();
   }
 
   /**
@@ -1378,6 +1396,123 @@ export class WebGLDrawingApp {
    */
   setBrushSize(size) {
     this.brushSize = size;
+  }
+
+  /**
+   * Update the outline panel with current shapes
+   */
+  updateOutlinePanel() {
+    const outlineList = document.getElementById('outline-content');
+    if (!outlineList) return;
+
+    outlineList.innerHTML = '';
+
+    // Get only shapes (not freehand strokes)
+    const shapes = this.strokes.filter(s => s.x1 !== undefined && s.x2 !== undefined);
+
+    if (shapes.length === 0) {
+      outlineList.innerHTML = '<div class="outline-empty">No shapes yet. Draw something!</div>';
+      return;
+    }
+
+    // Create outline items in reverse order (top of list = top layer = last drawn)
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      const item = this.createOutlineItem(shapes[i], shapes.length - 1 - i);
+      outlineList.appendChild(item);
+    }
+  }
+
+  /**
+   * Create an outline item element for a shape
+   */
+  createOutlineItem(shape, displayIndex) {
+    const item = document.createElement('div');
+    item.className = 'outline-item';
+    item.dataset.shapeId = shape.id;
+
+    // Add selected class if this shape is selected
+    if (this.selectedShape && this.selectedShape.id === shape.id) {
+      item.classList.add('selected');
+    }
+
+    // Icon based on shape type
+    const icon = document.createElement('div');
+    icon.className = 'outline-icon';
+    icon.textContent = this.getShapeIcon(shape.tool);
+    item.appendChild(icon);
+
+    // Label
+    const label = document.createElement('div');
+    label.className = 'outline-label';
+    label.textContent = this.getShapeLabel(shape);
+    item.appendChild(label);
+
+    // Color indicator
+    const colorDiv = document.createElement('div');
+    colorDiv.className = 'outline-color';
+    const r = Math.round(shape.color.r * 255);
+    const g = Math.round(shape.color.g * 255);
+    const b = Math.round(shape.color.b * 255);
+    colorDiv.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    item.appendChild(colorDiv);
+
+    // Click to select
+    item.addEventListener('click', () => {
+      this.selectShapeByIndex(displayIndex);
+    });
+
+    return item;
+  }
+
+  /**
+   * Get icon for shape type
+   */
+  getShapeIcon(tool) {
+    const icons = {
+      'rectangle': '▭',
+      'triangle': '▲',
+      'ellipse': '⬭',
+      'brush': '✏️',
+      'eraser': '🧹'
+    };
+    return icons[tool] || '●';
+  }
+
+  /**
+   * Get label for shape
+   */
+  getShapeLabel(shape) {
+    if (shape.customLabel) {
+      return shape.customLabel;
+    }
+
+    const labels = {
+      'rectangle': 'Rectangle',
+      'triangle': 'Triangle',
+      'ellipse': 'Ellipse'
+    };
+    return labels[shape.tool] || 'Shape';
+  }
+
+  /**
+   * Select shape by index in outline panel
+   */
+  selectShapeByIndex(displayIndex) {
+    const shapes = this.strokes.filter(s => s.x1 !== undefined && s.x2 !== undefined);
+
+    // Convert display index to actual array index
+    const actualIndex = shapes.length - 1 - displayIndex;
+
+    if (actualIndex >= 0 && actualIndex < shapes.length) {
+      const shape = shapes[actualIndex];
+
+      // Switch to select tool if not already
+      if (this.currentTool !== 'select') {
+        this.setTool('select');
+      }
+
+      this.selectShape(shape);
+    }
   }
 
   render() {
