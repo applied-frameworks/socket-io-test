@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Drawing App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #toolbar {
+            width: 80px;
+            background: #2a2a2a;
+            padding: 20px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+        }
+
+        .tool-btn {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 8px;
+            background: #3a3a3a;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .tool-btn:hover {
+            background: #4a4a4a;
+            transform: translateY(-2px);
+        }
+
+        .tool-btn.active {
+            background: #0066ff;
+        }
+
+        #color-picker, #fill-picker {
+            width: 60px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #outline-panel {
+            width: 250px;
+            background: #2a2a2a;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+        }
+
+        #panel-tabs {
+            display: flex;
+            border-bottom: 1px solid #3a3a3a;
+        }
+
+        .panel-tab {
+            flex: 1;
+            padding: 15px;
+            background: #2a2a2a;
+            color: #999;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+
+        .panel-tab:hover {
+            color: #ccc;
+            background: #333;
+        }
+
+        .panel-tab.active {
+            color: white;
+            background: #2a2a2a;
+            border-bottom-color: #0066ff;
+        }
+
+        .panel-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .panel-content.active {
+            display: block;
+        }
+
+        .outline-item {
+            background: #3a3a3a;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .outline-item:hover {
+            background: #4a4a4a;
+            border-color: #555;
+        }
+
+        .outline-item.selected {
+            background: #0066ff;
+            border-color: #0052cc;
+        }
+
+        .outline-item.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .outline-item.drag-over {
+            border-color: #0066ff;
+            border-style: dashed;
+        }
+
+        .outline-icon {
+            font-size: 20px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .outline-label {
+            color: white;
+            font-size: 14px;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: text;
+            transition: background 0.2s;
+        }
+
+        .outline-label:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .outline-label[contenteditable="true"] {
+            background: rgba(255, 255, 255, 0.15);
+            outline: 2px solid #0066ff;
+            cursor: text;
+        }
+
+        .outline-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid rgba(255,255,255,0.3);
+            flex-shrink: 0;
+        }
+
+        #outline-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #outline-list::-webkit-scrollbar-track {
+            background: #2a2a2a;
+        }
+
+        #outline-list::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        #outline-list::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        .outline-empty {
+            color: #666;
+            text-align: center;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
+        .history-item {
+            background: #3a3a3a;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            background: #4a4a4a;
+        }
+
+        .history-item.current {
+            background: #0066ff;
+        }
+
+        .history-item.future {
+            opacity: 0.5;
+        }
+
+        .history-icon {
+            font-size: 16px;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .history-text {
+            color: white;
+            font-size: 13px;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .history-time {
+            color: #999;
+            font-size: 11px;
+            flex-shrink: 0;
+        }
+
+        #canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #preview-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            display: block;
+        }
+
+        .selection-handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #0066ff;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            touch-action: none;
+        }
+
+        .selection-handle:hover {
+            background: #0052cc;
+            transform: scale(1.2);
+        }
+
+        .selection-box {
+            position: absolute;
+            border: 2px dashed #0066ff;
+            pointer-events: none;
+            z-index: 5;
+            cursor: move;
+        }
+
+        #status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .slider-container label {
+            color: #999;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            width: 60px;
+            -webkit-appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: #3a3a3a;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #0066ff;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #0066ff;
+            cursor: pointer;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="toolbar">
+            <button class="tool-btn" id="select-btn" title="Select">👆</button>
+            <button class="tool-btn active" id="brush-btn" title="Brush">✏️</button>
+            <button class="tool-btn" id="eraser-btn" title="Eraser">🧹</button>
+            <button class="tool-btn" id="rectangle-btn" title="Rectangle">▭</button>
+            <button class="tool-btn" id="triangle-btn" title="Triangle">▲</button>
+            <button class="tool-btn" id="ellipse-btn" title="Ellipse">⬭</button>
+            
+            <div class="slider-container">
+                <label>Stroke</label>
+                <input type="color" id="color-picker" value="#ffffff" title="Stroke Color">
+            </div>
+            
+            <div class="slider-container">
+                <label>Opacity</label>
+                <input type="range" id="stroke-opacity-slider" min="0" max="100" value="100">
+            </div>
+            
+            <div class="slider-container">
+                <label>Fill</label>
+                <input type="color" id="fill-picker" value="#ffffff" title="Fill Color">
+            </div>
+            
+            <div class="slider-container">
+                <label>Opacity</label>
+                <input type="range" id="fill-opacity-slider" min="0" max="100" value="0">
+            </div>
+            
+            <div class="slider-container">
+                <label>Size</label>
+                <input type="range" id="size-slider" min="1" max="50" value="5">
+            </div>
+            
+            <button class="tool-btn" id="delete-btn" title="Delete Shape" style="display:none;">🗑️</button>
+            <button class="tool-btn" id="clear-btn" title="Clear Canvas">🗑️</button>
+        </div>
+        
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <canvas id="preview-canvas"></canvas>
+            <div id="status">Ready</div>
+        </div>
+
+        <div id="outline-panel">
+            <div id="panel-tabs">
+                <button class="panel-tab active" id="outline-tab">Outline</button>
+                <button class="panel-tab" id="history-tab">History</button>
+            </div>
+            <div id="outline-content" class="panel-content active">
+                <div class="outline-empty">No shapes yet. Draw something!</div>
+            </div>
+            <div id="history-content" class="panel-content">
+                <div class="outline-empty">No actions yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
