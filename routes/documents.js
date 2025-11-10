@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../services/prisma');
 
 // Get all documents for the current user
 router.get('/', authenticateToken, async (req, res) => {
