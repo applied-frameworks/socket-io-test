@@ -100,6 +100,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/shapes', shapesRoutes);
 
+// Serve static files from the public folder
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 // Serve static files from the client build folder in production or staging
 if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
   const clientBuildPath = path.join(__dirname, 'client', 'dist');
