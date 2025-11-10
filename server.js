@@ -16,8 +16,8 @@ const documentManager = require('./services/documentManager');
 const app = express();
 const server = http.createServer(app);
 
-// Trust proxy for AWS Elastic Beanstalk / nginx
-app.set('trust proxy', true);
+// Trust proxy for AWS Elastic Beanstalk / nginx (1 hop)
+app.set('trust proxy', 1);
 
 // CORS origin configuration
 // In development: allow localhost with any port
