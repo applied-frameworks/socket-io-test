@@ -78,6 +78,8 @@ jobs:
 
       - name: Build frontend client
         run: npm run client:build
+        env:
+          VITE_API_URL: ${{ steps.set-env.outputs.env_url }}
 
       - name: Generate deployment package
         run: |
