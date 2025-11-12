@@ -10,11 +10,20 @@ This is a Socket.IO-based realtime collaborative canvas backend with JWT authent
 
 **Storage**: PostgreSQL (primary), supports 4 environments with zero code changes
 
+## Environment Terminology
+
+To avoid confusion, use these specific terms when discussing environments:
+
+- **local** = Developer's local machine (PostgreSQL via Docker)
+- **dev** = AWS Elastic Beanstalk development environment (PostgreSQL on AWS RDS)
+- **staging** = AWS Elastic Beanstalk staging environment (PostgreSQL on AWS RDS)
+- **prod** = AWS Elastic Beanstalk production environment (PostgreSQL on AWS RDS)
+
 **Environments**:
-1. Local Dev (PostgreSQL via Docker - recommended for production parity)
-2. Hosted Dev (PostgreSQL on AWS RDS)
-3. Hosted Staging (PostgreSQL on AWS RDS)
-4. Hosted Production (PostgreSQL on AWS RDS)
+1. **local** (PostgreSQL via Docker - recommended for production parity)
+2. **dev** (PostgreSQL on AWS RDS)
+3. **staging** (PostgreSQL on AWS RDS)
+4. **prod** (PostgreSQL on AWS RDS)
 
 ## Development Commands
 
@@ -35,9 +44,9 @@ npm run dev                # Start with nodemon (auto-reload) + client
 
 ### Database Commands
 ```bash
-# Migration Commands (Production-Safe)
-npm run db:migrate:dev     # Create & apply new migration (development)
-npm run db:migrate:deploy  # Apply pending migrations (production)
+# Migration Commands
+npm run db:migrate:dev     # Create & apply new migration (local only)
+npm run db:migrate:deploy  # Apply pending migrations (dev/staging/prod)
 npm run db:migrate:status  # Check migration status
 
 # Utility Commands
@@ -46,7 +55,7 @@ npm run db:generate        # Regenerate Prisma Client
 npm run db:reset           # Reset database with migrations
 npm run db:seed            # Seed database with test users
 
-# Prototyping Only (DO NOT use in production)
+# Prototyping Only (DO NOT use in dev/staging/prod)
 npm run db:push            # Push schema without migrations
 ```
 
@@ -97,7 +106,7 @@ npm run test:report  # Open HTML test report
 
 ### Environment Setup
 
-**Local Development with Docker (Recommended)**:
+**Local Environment Setup (Docker + PostgreSQL)**:
 ```bash
 # 1. Copy .env.example to .env
 cp .env.example .env
@@ -115,7 +124,7 @@ docker compose up -d
 npm run db:migrate:dev
 ```
 
-**Environment Variables** (`.env`):
+**Local Environment Variables** (`.env`):
 ```bash
 PORT=3000
 JWT_SECRET=<generated-secret-from-step-3>
@@ -246,14 +255,14 @@ This project uses PostgreSQL as the primary database with Prisma migrations for 
 ### Environment Workflow
 
 ```
-Local Dev → Git → Hosted Dev → Hosted Staging → Hosted Production
+local → Git → dev → staging → prod
 ```
 
 **Key Principle**: The same `schema.prisma` and `prisma/migrations/` folder work across all environments. Only `DATABASE_URL` changes per environment.
 
 ### Environment Configurations
 
-#### 1. Local Development (PostgreSQL via Docker)
+#### 1. local (PostgreSQL via Docker)
 ```bash
 # .env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/canvas_dev?schema=public"
@@ -264,7 +273,7 @@ npm run db:migrate:dev            # Create/apply migrations
 npm run db:seed                   # Seed test data
 ```
 
-#### 2. Hosted Dev (AWS RDS PostgreSQL)
+#### 2. dev (AWS RDS PostgreSQL)
 ```bash
 # Environment variable in AWS Elastic Beanstalk
 DATABASE_URL="postgresql://user:pass@dev-db.aws.com:5432/canvas_dev?schema=public"
@@ -274,7 +283,7 @@ git push origin dev
 # → Runs: npx prisma migrate deploy
 ```
 
-#### 3. Hosted Staging (AWS RDS PostgreSQL)
+#### 3. staging (AWS RDS PostgreSQL)
 ```bash
 # Environment variable in AWS Elastic Beanstalk
 DATABASE_URL="postgresql://user:pass@staging-db.aws.com:5432/canvas_staging?schema=public"
@@ -284,7 +293,7 @@ git push origin staging
 # → Runs: npx prisma migrate deploy
 ```
 
-#### 4. Hosted Production (AWS RDS PostgreSQL)
+#### 4. prod (AWS RDS PostgreSQL)
 ```bash
 # Environment variable in AWS Elastic Beanstalk
 DATABASE_URL="postgresql://user:pass@prod-db.aws.com:5432/canvas_prod?schema=public"
@@ -296,7 +305,7 @@ git push origin main
 
 ### Migration Workflow
 
-**Development (Creating Migrations)**:
+**local (Creating Migrations)**:
 ```bash
 # 1. Modify schema in prisma/schema.prisma
 # 2. Create migration
@@ -309,7 +318,7 @@ git commit -m "Add new feature schema"
 git push
 ```
 
-**Production (Applying Migrations)**:
+**dev/staging/prod (Applying Migrations)**:
 - Migrations are **automatically applied** during deployment
 - The predeploy hook (`.platform/hooks/predeploy/01_database.sh`) runs `prisma migrate deploy`
 - This applies all pending migrations safely without data loss
@@ -317,8 +326,8 @@ git push
 ### Important Notes
 
 - **Never edit migration files manually** - always generate via `prisma migrate dev`
-- **Never use `db:push` in production** - it bypasses migration history
-- **Always test migrations in dev/staging** before production
+- **Never use `db:push` in dev/staging/prod** - it bypasses migration history
+- **Always test migrations in dev/staging** before prod
 - **Migration files are committed to git** - they are the source of truth
 - **Rollbacks**: Use `prisma migrate resolve` if needed (see Prisma docs)
 
@@ -331,8 +340,8 @@ git push
 
 ## Important Notes
 
-- **Database**: PostgreSQL for all environments (local via Docker, hosted via AWS RDS)
-- **Migrations**: Use `db:migrate:dev` in development, `db:migrate:deploy` runs automatically in production
+- **Database**: PostgreSQL for all environments (local via Docker, dev/staging/prod via AWS RDS)
+- **Migrations**: Use `db:migrate:dev` in local, `db:migrate:deploy` runs automatically in dev/staging/prod
 - **Code Promotion**: Zero file changes needed - same codebase works across all 4 environments
 - **Prisma Client**: Auto-generated after migrations - regenerate with `npm run db:generate` if needed
 - **Testing**: UI tests require both backend (port 3000) and frontend (port 8000) servers running via `npm run dev`
@@ -340,4 +349,4 @@ git push
 - **Draw Events**: Persisted but limited to last 1000 per canvas
 - **Active Users**: In-memory only (not persisted to database, cleared on restart)
 - **Socket.IO Settings**: 25s ping interval, 60s timeout (adjust for network conditions)
-- **Cleanup**: Canvases with no users for 24h deleted hourly - consider external cron in production
+- **Cleanup**: Canvases with no users for 24h deleted hourly - consider external cron in prod
