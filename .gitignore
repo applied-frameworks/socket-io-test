@@ -42,6 +42,7 @@ prisma/*.db-journal
 # Playwright
 playwright-report/
 test-results/
+smoke-report/
 playwright/.cache/
 
 # Temporary/Debug files

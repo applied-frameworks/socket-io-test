@@ -18,6 +18,8 @@
     "test:api": "playwright test tests/auth.spec.js",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
+    "test:smoke": "playwright test --config=playwright.smoke.config.js",
+    "test:smoke:report": "playwright show-report smoke-report",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
