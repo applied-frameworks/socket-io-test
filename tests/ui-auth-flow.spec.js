@@ -67,12 +67,15 @@ test.describe('UI Authentication Flow', () => {
 
     // Step 4: Submit signup form
     console.log('📍 Step 4: Submitting signup form...');
-    await page.click('button[type="submit"]:has-text("Sign Up")');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }),
+      page.click('button[type="submit"]:has-text("Sign Up")')
+    ]);
 
-    // Step 5: Verify redirect to landing page after signup
-    console.log('📍 Step 5: Verifying signup success and redirect to landing page...');
-    await expect(page.locator('h1')).toContainText('Logged In', { timeout: 10000 });
-    await expect(page.locator(`text=Welcome, ${testFirstName} ${testLastName}!`)).toBeVisible();
+    // Step 5: Verify redirect to documents page after signup
+    console.log('📍 Step 5: Verifying signup success and redirect to documents page...');
+    await expect(page.locator('h1')).toContainText('My Documents', { timeout: 10000 });
+    await expect(page.locator('.username')).toContainText(`${testFirstName} ${testLastName}`);
 
     // Verify user was created in database and get the user ID
     const user = await prisma.user.findUnique({
@@ -103,17 +106,23 @@ test.describe('UI Authentication Flow', () => {
     console.log('📍 Step 8: Logging in with the same credentials...');
     await page.fill('input#email', testEmail);
     await page.fill('input#password', testPassword);
-    await page.click('button[type="submit"]:has-text("Sign In")');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }),
+      page.click('button[type="submit"]:has-text("Sign In")')
+    ]);
 
     // Step 9: Verify successful login
     console.log('📍 Step 9: Verifying successful login...');
-    await expect(page.locator('h1')).toContainText('Logged In', { timeout: 10000 });
-    await expect(page.locator(`text=Welcome, ${testFirstName} ${testLastName}!`)).toBeVisible();
+    await expect(page.locator('h1')).toContainText('My Documents', { timeout: 10000 });
+    await expect(page.locator('.username')).toContainText(`${testFirstName} ${testLastName}`);
     console.log('✅ Login successful');
 
     // Step 10: Logout again
     console.log('📍 Step 10: Logging out again...');
-    await page.click('button:has-text("Logout")');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }),
+      page.click('button:has-text("Logout")')
+    ]);
     await expect(page.locator('h1')).toContainText('Realtime Canvas');
     console.log('✅ Logout successful');
 

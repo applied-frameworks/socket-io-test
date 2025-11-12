@@ -12,18 +12,13 @@ module.exports = defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    screenshot: 'on',      // Take screenshots for all tests
+    video: 'on',           // Record and keep videos for all tests
   },
   webServer: {
-    command: `DATABASE_URL="${process.env.DATABASE_URL}" JWT_SECRET="${process.env.JWT_SECRET}" CLIENT_URL="${process.env.CLIENT_URL}" PORT=${process.env.PORT || 3000} npm run server`,
-    url: 'http://localhost:3000/health',
+    command: `DATABASE_URL="${process.env.DATABASE_URL}" JWT_SECRET="${process.env.JWT_SECRET}" CLIENT_URL="${process.env.CLIENT_URL}" npm run dev:test`,
+    url: 'http://localhost:8000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
-    env: {
-      NODE_ENV: 'test',
-      DATABASE_URL: process.env.DATABASE_URL,
-      JWT_SECRET: process.env.JWT_SECRET,
-      CLIENT_URL: process.env.CLIENT_URL,
-      PORT: process.env.PORT || '3000',
-    },
   },
 });

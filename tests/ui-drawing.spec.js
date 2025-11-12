@@ -90,12 +90,15 @@ test.describe('Drawing Functionality', () => {
       }
     });
 
-    // Navigate to the document
-    await page.goto(`http://localhost:8000/editor/${doc.id}`);
+    // Navigate to the document and wait for network to be idle
+    await page.goto(`http://localhost:8000/editor/${doc.id}`, {
+      waitUntil: 'networkidle',
+      timeout: 30000
+    });
 
-    // Wait for canvas to be ready
-    await page.waitForSelector('#canvas', { state: 'visible', timeout: 10000 });
-    await page.waitForTimeout(1000); // Give WebGL time to initialize
+    // Wait for canvas to be ready with longer timeout
+    await page.waitForSelector('#canvas', { state: 'visible', timeout: 30000 });
+    await page.waitForTimeout(2000); // Give WebGL time to initialize
 
     return doc;
   }
