@@ -3,40 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple HTML Page</title>
+    <title>Realtime Canvas - Public Demo</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
-            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
         }
         h1 {
             color: #333;
+            font-size: 2.5em;
+            margin-bottom: 20px;
         }
-        .container {
-            background-color: #f4f4f4;
+        .subtitle {
+            color: #667eea;
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+        p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        .features {
+            background: #f8f9fa;
+            border-radius: 8px;
             padding: 20px;
-            border-radius: 5px;
+            margin: 30px 0;
+        }
+        .features h2 {
+            color: #333;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        .features ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .features li {
+            color: #666;
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            color: #999;
+            font-size: 0.9em;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Welcome to Your Simple HTML Page</h1>
-        <p>This is a simple HTML file hosted from the public directory.</p>
-        <p>Current time: <span id="time"></span></p>
-    </div>
+        <h1>Realtime Canvas</h1>
+        <p class="subtitle">Collaborative Drawing Made Simple</p>
 
-    <script>
-        // Display current time
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('time').textContent = now.toLocaleString();
-        }
-        updateTime();
-        setInterval(updateTime, 1000);
-    </script>
+        <p>Welcome to Realtime Canvas - a powerful collaborative drawing platform where multiple users can create, edit, and share visual content in real-time.</p>
+
+        <div class="features">
+            <h2>Features</h2>
+            <ul>
+                <li>Real-time collaborative drawing</li>
+                <li>Multiple drawing tools (rectangle, ellipse, triangle, brush)</li>
+                <li>Color and opacity controls</li>
+                <li>Shape selection and manipulation</li>
+                <li>Live cursor tracking</li>
+                <li>Integrated chat system</li>
+                <li>Secure JWT authentication</li>
+            </ul>
+        </div>
+
+        <p>This is a public demo page served from the <code>/public</code> directory. No authentication required to view this content.</p>
+
+        <div class="footer">
+            <p>Powered by Socket.IO, Express, and React</p>
+        </div>
+    </div>
 </body>
 </html>
