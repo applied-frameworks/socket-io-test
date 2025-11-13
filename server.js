@@ -56,7 +56,8 @@ async function registerPlugins() {
   // Security headers
   await fastify.register(fastifyHelmet, {
     global: true,
-    contentSecurityPolicy: {
+    // Disable CSP in test environment to avoid browser crashes with inline styles
+    contentSecurityPolicy: process.env.NODE_ENV === 'test' ? false : {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],

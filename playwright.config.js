@@ -15,10 +15,12 @@ module.exports = defineConfig({
     screenshot: 'on',      // Take screenshots for all tests
     video: 'on',           // Record and keep videos for all tests
   },
-  webServer: {
-    command: `DATABASE_URL="${process.env.DATABASE_URL}" JWT_SECRET="${process.env.JWT_SECRET}" CLIENT_URL="${process.env.CLIENT_URL}" npm run dev:test`,
-    url: 'http://localhost:8000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  // Note: Start the server manually before running tests: npm run dev:test
+  // Then run tests in a separate terminal: npm test
+  // webServer: {
+  //   command: `npm run dev:test`,
+  //   url: 'http://localhost:3000/health',
+  //   reuseExistingServer: true,
+  //   timeout: 120 * 1000,
+  // },
 });
