@@ -17,8 +17,6 @@ model User {
   lastLogin     DateTime       @default(now())
   documentUsers DocumentUser[]
   documents     Document[]
-  drawEvents    DrawEvent[]
-  shapes        Shape[]
 
   @@map("users")
 }
@@ -31,8 +29,6 @@ model Document {
   lastModified  DateTime       @updatedAt
   documentUsers DocumentUser[]
   owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  drawEvents    DrawEvent[]
-  shapes        Shape[]
 
   @@map("documents")
 }
@@ -47,56 +43,4 @@ model DocumentUser {
 
   @@unique([userId, documentId])
   @@map("document_users")
-}
-
-model Shape {
-  id           String    @id @default(cuid())
-  documentId   String
-  userId       String
-  type         String    // 'rectangle', 'triangle', 'ellipse', 'brush', 'eraser'
-
-  // Shape coordinates (for rectangle, triangle, ellipse)
-  x1           Float?
-  y1           Float?
-  x2           Float?
-  y2           Float?
-
-  // Styling
-  strokeColor  String?   // JSON: {r, g, b, a}
-  fillColor    String?   // JSON: {r, g, b, a}
-  strokeSize   Float?
-  customLabel  String?
-
-  // Stroke points (for brush, eraser)
-  points       String?   // JSON array: [{x, y}, ...]
-
-  // Layering
-  order        Int       @default(0)
-
-  // Additional data (for extensibility)
-  data         String?   // JSON string for any additional properties
-
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Relations
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId])
-  @@index([documentId, order])
-  @@map("shapes")
-}
-
-model DrawEvent {
-  id         String   @id @default(cuid())
-  documentId String
-  userId     String
-  data       String
-  timestamp  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId, timestamp])
-  @@map("draw_events")
 }
