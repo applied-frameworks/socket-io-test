@@ -16,6 +16,7 @@ async function documentRoutes(fastify, options) {
         select: {
           id: true,
           name: true,
+          ownerId: true,
           createdAt: true,
           lastModified: true,
           owner: {
@@ -54,6 +55,12 @@ async function documentRoutes(fastify, options) {
         });
       }
 
+      if (name.trim().length > 100) {
+        return reply.code(400).send({
+          error: 'Document name must be less than 100 characters'
+        });
+      }
+
       const document = await prisma.document.create({
         data: {
           name: name.trim(),
@@ -71,7 +78,13 @@ async function documentRoutes(fastify, options) {
         }
       });
 
-      return reply.code(201).send({ document });
+      return reply.code(201).send({
+        message: 'Document created successfully',
+        document: {
+          ...document,
+          ownerId: document.ownerId
+        }
+      });
     } catch (error) {
       console.error('Error creating document:', error);
       return reply.code(500).send({
@@ -89,7 +102,12 @@ async function documentRoutes(fastify, options) {
 
       const document = await prisma.document.findUnique({
         where: { id },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          ownerId: true,
+          createdAt: true,
+          lastModified: true,
           owner: {
             select: {
               id: true,
@@ -137,6 +155,12 @@ async function documentRoutes(fastify, options) {
         });
       }
 
+      if (name.trim().length > 100) {
+        return reply.code(400).send({
+          error: 'Document name must be less than 100 characters'
+        });
+      }
+
       // Check if document exists and user owns it
       const existingDocument = await prisma.document.findUnique({
         where: { id }
@@ -160,7 +184,12 @@ async function documentRoutes(fastify, options) {
         data: {
           name: name.trim()
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          ownerId: true,
+          createdAt: true,
+          lastModified: true,
           owner: {
             select: {
               id: true,
@@ -172,7 +201,10 @@ async function documentRoutes(fastify, options) {
         }
       });
 
-      return { document };
+      return {
+        message: 'Document updated successfully',
+        document
+      };
     } catch (error) {
       console.error('Error updating document:', error);
       return reply.code(500).send({

@@ -107,7 +107,7 @@ async function authRoutes(fastify, options) {
       const user = await userStore.getUserByEmail(email);
       if (!user) {
         return reply.code(401).send({
-          error: 'Invalid credentials'
+          error: 'Invalid email or password'
         });
       }
 
@@ -115,7 +115,7 @@ async function authRoutes(fastify, options) {
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) {
         return reply.code(401).send({
-          error: 'Invalid credentials'
+          error: 'Invalid email or password'
         });
       }
 
@@ -170,10 +170,62 @@ async function authRoutes(fastify, options) {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin
       };
     } catch (error) {
       console.error('Profile error:', error);
+      return reply.code(500).send({
+        error: 'Internal server error'
+      });
+    }
+  });
+
+  // Get current user info (alias for /profile)
+  fastify.get('/me', {
+    preHandler: authenticateToken
+  }, async (request, reply) => {
+    try {
+      const user = await userStore.getUserById(request.user.userId);
+
+      if (!user) {
+        return reply.code(404).send({
+          error: 'User not found'
+        });
+      }
+
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin
+      };
+    } catch (error) {
+      console.error('Profile error:', error);
+      return reply.code(500).send({
+        error: 'Internal server error'
+      });
+    }
+  });
+
+  // Verify token
+  fastify.get('/verify', {
+    preHandler: authenticateToken
+  }, async (request, reply) => {
+    try {
+      return {
+        valid: true,
+        user: {
+          userId: request.user.userId,
+          firstName: request.user.firstName,
+          lastName: request.user.lastName,
+          email: request.user.email
+        }
+      };
+    } catch (error) {
+      console.error('Verify error:', error);
       return reply.code(500).send({
         error: 'Internal server error'
       });
